@@ -24,11 +24,16 @@
 #include "../rv5s_no_fw_hz/rv5s_no_fw_hz_ifid.h"
 #include "../rv5s_3s/rv5s_3s_exmem.h" // MODIFIED
 #include "../rv5s/rv5s_idex.h"
-#include "../rv5s/rv5s_memwb.h"
+#include "../rv5s_3s/rv5s_3s_memwb.h" // MODIFIED
 
 // Forwarding & Hazard detection unit
 #include "../rv5s/rv5s_forwardingunit.h"
 #include "../rv5s/rv5s_hazardunit.h"
+
+// MODIFIED: source ALU result from WB if delay slot execution is stalled
+namespace Ripes {
+  enum class PcAluSrc { MemStage, WbStage };
+}
 
 namespace vsrtl {
 namespace core {
@@ -65,9 +70,12 @@ public:
     // Note: pc_src works uses the PcSrc enum, but is selected by the boolean
     // signal from the controlflow OR gate. PcSrc enum values must adhere to the
     // boolean 0/1 values.
-    // MODIFIED: controlflow_or->out is routed through exmem->do_branch
+    // MODIFIED: controlflow_or->out is routed through exmem->do_branch,
+    //           or through memwb->do_branch in case of a load-use stall
     // controlflow_or->out >> pc_src->select;
-    exmem_reg->do_branch_out >> pc_src->select;
+    exmem_reg->do_branch_out >> *pc_select_or->in[0];
+    memwb_reg->do_branch_out >> *pc_select_or->in[1];
+    pc_select_or->out >> pc_src->select;
 
     // MODIFIED: disconnect controlflow and syscallExit signals from efsc_or
     // controlflow_or->out >> *efsc_or->in[0];
@@ -121,9 +129,12 @@ public:
     idex_reg->do_jmp_out >> *controlflow_or->in[1];
 
     pc_4->out >> pc_src->get(PcSrc::PC4);
-    // MODIFIED: get ALU result from EXMEM
+    // MODIFIED: get ALU result from PcAluSrc
     // alu->res >> pc_src->get(PcSrc::ALU);
-    exmem_reg->alures_out >> pc_src->get(PcSrc::ALU);
+    memwb_reg->do_branch_out >> pc_alu_src->select;
+    exmem_reg->alures_out >> pc_alu_src->get(PcAluSrc::MemStage);
+    memwb_reg->alures_out >> pc_alu_src->get(PcAluSrc::WbStage);
+    pc_alu_src->out >> pc_src->get(PcSrc::ALU);
 
     // -----------------------------------------------------------------------
     // ALU
@@ -246,6 +257,11 @@ public:
 
     // -----------------------------------------------------------------------
     // MEM/WB
+    // MODIFIED: propagate branch taken signal to MEM/WB register if it
+    //           coincides with a load-use hazard stall
+    exmem_reg->do_branch_out >> *br_extend_and->in[0];
+    hzunit->hazardIDEXClear >> *br_extend_and->in[1];
+    br_extend_and->out >> memwb_reg->do_branch_in;
 
     exmem_reg->stalled_out >> memwb_reg->stalled_in;
 
@@ -305,7 +321,7 @@ public:
   SUBCOMPONENT(ifid_reg, TYPE(IFID<XLEN>));
   SUBCOMPONENT(idex_reg, TYPE(RV5S_IDEX<XLEN>));
   SUBCOMPONENT(exmem_reg, TYPE(RV5S_3S_EXMEM<XLEN>)); // MODIFIED
-  SUBCOMPONENT(memwb_reg, TYPE(RV5S_MEMWB<XLEN>));
+  SUBCOMPONENT(memwb_reg, TYPE(RV5S_3S_MEMWB<XLEN>)); // MODIFIED
 
   // Multiplexers
   SUBCOMPONENT(reg_wr_src, TYPE(EnumMultiplexer<RegWrSrc, XLEN>));
@@ -315,6 +331,7 @@ public:
   SUBCOMPONENT(reg1_fw_src, TYPE(EnumMultiplexer<ForwardingSrc, XLEN>));
   SUBCOMPONENT(reg2_fw_src, TYPE(EnumMultiplexer<ForwardingSrc, XLEN>));
   SUBCOMPONENT(pc_inc, TYPE(EnumMultiplexer<PcInc, XLEN>));
+  SUBCOMPONENT(pc_alu_src, TYPE(EnumMultiplexer<PcAluSrc, XLEN>)); // MODIFIED
 
   // Memories
   SUBCOMPONENT(instr_mem, TYPE(ROM<XLEN, c_RVInstrWidth>));
@@ -327,14 +344,17 @@ public:
   // Gates
   // True if branch instruction and branch taken
   SUBCOMPONENT(br_and, TYPE(And<1, 2>));
+  // MODIFIED: True when controlflow action coincides with load-use hazard
+  SUBCOMPONENT(br_extend_and, TYPE(And<1, 2>));
   // True if branch taken or jump instruction
   SUBCOMPONENT(controlflow_or, TYPE(Or<1, 2>));
   // True if controlflow action or performing syscall finishing
-  // SUBCOMPONENT(efsc_or, TYPE(Or<1, 2>));		// MODIFIED
+  // SUBCOMPONENT(efsc_or, TYPE(Or<1, 2>));    // MODIFIED
   // True if above or stalling due to load-use hazard
   SUBCOMPONENT(efschz_or, TYPE(Or<1, 2>));
 
   SUBCOMPONENT(mem_stalled_or, TYPE(Or<1, 2>));
+  SUBCOMPONENT(pc_select_or, TYPE(Or<1, 2>));  // MODIFIED
 
   // Address spaces
   ADDRESSSPACEMM(m_memory);
