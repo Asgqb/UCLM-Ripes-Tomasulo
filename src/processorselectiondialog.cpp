@@ -54,32 +54,15 @@ ProcessorSelectionDialog::ProcessorSelectionDialog(QWidget *parent)
       datapathList.append(datapath);
       m_ui->datapath->addItem(datapathName, (int)datapath);
     }
-  }
 
-  // Populate processor extensions
-  auto isaInfo = desc.isaInfo();
-  for (const auto &ext : std::as_const(isaInfo.supportedExtensions)) {
-    auto chkbox = new QCheckBox(ext);
-    chkbox->setToolTip(isaInfo.isa->extensionDescription(ext));
-    m_ui->extensions->addWidget(chkbox);
-    if (m_selectedExtensionsForID[desc.id].contains(ext)) {
-      chkbox->setChecked(true);
-    }
-    // Connect checkbox toggle events
-    connect(chkbox, &QCheckBox::toggled, this, [=](bool toggled) {
-      if (toggled) {
-        m_selectedExtensionsForID[m_selectedID] << ext;
-      } else {
-        m_selectedExtensionsForID[m_selectedID].removeAll(ext);
-      }
-    });
-  }
-
-  // Populate default extensions for other processors
-  for (const auto &desc : ProcessorRegistry::getAvailableProcessors()) {
+    // Initialize selected extensions for processors while we're here
     m_selectedExtensionsForID[desc.second->id] =
         desc.second->isaInfo().defaultExtensions;
   }
+
+  // Set selected extensions for current processor
+  m_selectedExtensionsForID[ProcessorHandler::getID()] =
+      ProcessorHandler::currentISA()->enabledExtensions();
 
   // Populate processor variant options
   populateVariants();
@@ -110,6 +93,25 @@ ProcessorSelectionDialog::ProcessorSelectionDialog(QWidget *parent)
       m_ui->branchSlots->findData(desc.tags.branchDelaySlots));
   // Description
   m_ui->description->setText(desc.description);
+
+  // Update extension checkboxes
+  auto isaInfo = desc.isaInfo();
+  for (const auto &ext : std::as_const(isaInfo.supportedExtensions)) {
+    auto chkbox = new QCheckBox(ext);
+    chkbox->setToolTip(isaInfo.isa->extensionDescription(ext));
+    m_ui->extensions->addWidget(chkbox);
+    if (m_selectedExtensionsForID[desc.id].contains(ext)) {
+      chkbox->setChecked(true);
+    }
+    // Connect checkbox toggle events
+    connect(chkbox, &QCheckBox::toggled, this, [=](bool toggled) {
+      if (toggled) {
+        m_selectedExtensionsForID[m_selectedID] << ext;
+      } else {
+        m_selectedExtensionsForID[m_selectedID].removeAll(ext);
+      }
+    });
+  }
 
   // Disable options if there are no more available ones for current config
   setEnabledVariants();
