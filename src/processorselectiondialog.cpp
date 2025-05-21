@@ -54,6 +54,10 @@ ProcessorSelectionDialog::ProcessorSelectionDialog(QWidget *parent)
       datapathList.append(datapath);
       m_ui->datapath->addItem(datapathName, (int)datapath);
     }
+
+    // Initialize selected extensions for processors while we're here
+    m_selectedExtensionsForID[desc.second->id] =
+        desc.second->isaInfo().defaultExtensions;
   }
 
   // Populate processor extensions
@@ -73,12 +77,6 @@ ProcessorSelectionDialog::ProcessorSelectionDialog(QWidget *parent)
         m_selectedExtensionsForID[m_selectedID].removeAll(ext);
       }
     });
-  }
-
-  // Populate default extensions for other processors
-  for (const auto &desc : ProcessorRegistry::getAvailableProcessors()) {
-    m_selectedExtensionsForID[desc.second->id] =
-        desc.second->isaInfo().defaultExtensions;
   }
 
   // Populate processor variant options
