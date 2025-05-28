@@ -202,6 +202,13 @@ void ProcessorTab::setupSimulatorActions(QToolBar *controlToolbar) {
   connect(m_selectProcessorAction, &QAction::triggered, this,
           &ProcessorTab::processorSelection);
   controlToolbar->addAction(m_selectProcessorAction);
+ 
+  const QIcon cacheIcon = QIcon(":/icons/server.svg");
+  m_selectProcessorAction =
+      new QAction(cacheIcon, "Select cache", this);
+  connect(m_selectProcessorAction, &QAction::triggered, this,
+          &ProcessorTab::processorSelection);
+  controlToolbar->addAction(m_selectProcessorAction);
   controlToolbar->addSeparator();
 
   const QIcon resetIcon = QIcon(":/icons/reset.svg");
