@@ -16,6 +16,7 @@
 #include "processorhandler.h"
 #include "processorregistry.h"
 #include "processorselectiondialog.h"
+#include "cacheselectiondialog.h"
 #include "registercontainerwidget.h"
 #include "registermodel.h"
 #include "ripessettings.h"
@@ -204,11 +205,11 @@ void ProcessorTab::setupSimulatorActions(QToolBar *controlToolbar) {
   controlToolbar->addAction(m_selectProcessorAction);
  
   const QIcon cacheIcon = QIcon(":/icons/server.svg");
-  m_selectProcessorAction =
+  m_selectCacheAction =
       new QAction(cacheIcon, "Select cache", this);
-  connect(m_selectProcessorAction, &QAction::triggered, this,
-          &ProcessorTab::processorSelection);
-  controlToolbar->addAction(m_selectProcessorAction);
+  connect(m_selectCacheAction, &QAction::triggered, this,
+          &ProcessorTab::cacheSelection);
+  controlToolbar->addAction(m_selectCacheAction);
   controlToolbar->addSeparator();
 
   const QIcon resetIcon = QIcon(":/icons/reset.svg");
@@ -407,6 +408,21 @@ void ProcessorTab::processorSelection() {
     if (m_displayValuesAction->isChecked()) {
       m_vsrtlWidget->setOutputPortValuesVisible(true);
     }
+  }
+}
+
+
+void ProcessorTab::cacheSelection() {
+  CacheSelectionDialog dialog;
+  if (dialog.exec() == QDialog::Accepted) {
+    CacheConfigType selectedType = dialog.getSelectedCacheType();
+    
+    // Aquí puedes hacer algo con la selección,
+    // por ejemplo almacenar la preferencia o usarla para crear la caché
+    qDebug() << "Cache type selected:" << static_cast<int>(selectedType);
+
+    // Si necesitas crear un nuevo CacheTab, aquí sería un buen lugar
+    // Ejemplo (dependiendo de tu diseño): createCacheTab(selectedType);
   }
 }
 

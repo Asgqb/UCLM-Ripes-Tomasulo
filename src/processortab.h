@@ -50,6 +50,7 @@ public slots:
   void fitToScreen();
 
   void processorSelection();
+  void cacheSelection();
 
 private slots:
   void run(bool state);
@@ -78,6 +79,7 @@ private:
 
   // Actions
   QAction *m_selectProcessorAction = nullptr;
+  QAction* m_selectCacheAction = nullptr;
   QAction *m_clockAction = nullptr;
   QAction *m_autoClockAction = nullptr;
   QAction *m_runAction = nullptr;
