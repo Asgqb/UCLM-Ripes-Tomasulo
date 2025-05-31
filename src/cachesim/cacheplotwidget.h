@@ -3,6 +3,8 @@
 #include <QMetaType>
 #include <QWidget>
 #include <QtCharts/QChartGlobal>
+// #include <QGraphicsScene>
+
 
 #include "cachesim.h"
 #include "float.h"
@@ -57,6 +59,7 @@ public:
   explicit CachePlotWidget(QWidget *parent = nullptr);
   void setCache(const std::shared_ptr<CacheSim> &cache);
   ~CachePlotWidget();
+  
 
 public slots:
 

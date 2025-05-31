@@ -3,17 +3,13 @@
 #include <QDialog>
 #include <QTreeWidget>
 
+#include "cachesim/cachetypes.h"  // <-- Aquí importas la definición del enum
+
 namespace Ripes {
 
 namespace Ui {
 class CacheSelectionDialog;
 }
-
-enum class CacheConfigType {
-  L1Split,
-  L1Unified,
-  Multilevel
-};
 
 class CacheSelectionDialog : public QDialog {
   Q_OBJECT
@@ -36,4 +32,3 @@ private:
 };
 
 } // namespace Ripes
-

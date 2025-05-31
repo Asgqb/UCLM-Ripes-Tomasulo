@@ -20,6 +20,7 @@
 #include "registercontainerwidget.h"
 #include "registermodel.h"
 #include "ripessettings.h"
+#include "cachesim/cachetypes.h"
 #include "syscall/systemio.h"
 
 #include "VSRTL/graphics/vsrtl_widget.h"
@@ -416,13 +417,12 @@ void ProcessorTab::cacheSelection() {
   CacheSelectionDialog dialog;
   if (dialog.exec() == QDialog::Accepted) {
     CacheConfigType selectedType = dialog.getSelectedCacheType();
-    
-    // Aquí puedes hacer algo con la selección,
-    // por ejemplo almacenar la preferencia o usarla para crear la caché
+    RipesSettings::setValue("CacheTypeSelected", static_cast<int>(selectedType));
     qDebug() << "Cache type selected:" << static_cast<int>(selectedType);
-
-    // Si necesitas crear un nuevo CacheTab, aquí sería un buen lugar
-    // Ejemplo (dependiendo de tu diseño): createCacheTab(selectedType);
+    //ProcessorHandler::reset(); // para forzar el reinicio por si acaso es necesario
+    
+    emit cacheConfigurationChanged();
+    
   }
 }
 

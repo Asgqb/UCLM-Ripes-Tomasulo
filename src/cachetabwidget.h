@@ -2,6 +2,7 @@
 #include <QWidget>
 
 #include "cachesim/l1cacheshim.h"
+#include "cachesim/unifiedcacheshim.h"
 
 // #define N_CACHES_ENABLED
 
@@ -25,6 +26,7 @@ public:
    * view to the screen size, when initially starting the application.
    */
   void flipTabs();
+  void rebuildCacheTabs();
 
 signals:
   void focusAddressChanged(unsigned address);
@@ -44,6 +46,9 @@ private:
 
   std::unique_ptr<L1CacheShim> m_l1dShim;
   std::unique_ptr<L1CacheShim> m_l1iShim;
+
+  std::unique_ptr<UnifiedCacheShim> m_unifiedShim;
+  std::unique_ptr<CacheWidget> m_unifiedCacheWidget;
 };
 
 } // namespace Ripes

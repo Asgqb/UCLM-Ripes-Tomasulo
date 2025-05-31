@@ -58,6 +58,10 @@ private slots:
   void autoClockTimeout();
   void setInstructionViewCenterRow(int row);
   void showPipelineDiagram();
+  
+  // Añado esto para ver si puedo conseguir recargar pestañas desde aquí cuando se cambie la config
+ signals: 
+  void cacheConfigurationChanged();
 
 private:
   void setupSimulatorActions(QToolBar *controlToolbar);
@@ -80,6 +84,7 @@ private:
   // Actions
   QAction *m_selectProcessorAction = nullptr;
   QAction* m_selectCacheAction = nullptr;
+
   QAction *m_clockAction = nullptr;
   QAction *m_autoClockAction = nullptr;
   QAction *m_runAction = nullptr;

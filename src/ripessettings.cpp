@@ -1,6 +1,7 @@
 #include "ripessettings.h"
 #include "assembler/program.h"
 #include "cachesim/cachesim.h"
+#include "cachesim/cachetypes.h"
 
 #include <QCoreApplication>
 #include <map>
@@ -71,6 +72,8 @@ const std::map<QString, QVariant> s_defaultSettings = {
     {RIPES_SETTING_SHOWSIGNALS, false},
     {RIPES_SETTING_INPUT_TYPE, static_cast<unsigned>(SourceType::Assembly)},
     {RIPES_SETTING_AUTOCLOCK_INTERVAL, 100},
+
+    { "CacheTypeSelected", 0 },
 
     {RIPES_SETTING_HAS_SAVEFILE, false},
     {RIPES_SETTING_SAVEPATH, ""},

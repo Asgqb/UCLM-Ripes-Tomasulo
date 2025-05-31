@@ -4,9 +4,12 @@
 #include "memorytab.h"
 #include "memoryviewerwidget.h"
 #include "ripessettings.h"
+#include "cachesim/cachetypes.h"
+#include "processortab.h"
 
 #include <QTabBar>
 #include <QWheelEvent>
+#include <QDebug>
 
 namespace Ripes {
 
@@ -32,53 +35,86 @@ CacheTabWidget::CacheTabWidget(QWidget *parent)
     : QWidget(parent), m_ui(new Ui::CacheTabWidget) {
   m_ui->setupUi(this);
 
-  m_l1dShim =
-      std::make_unique<L1CacheShim>(L1CacheShim::CacheType::DataCache, this);
-  m_l1iShim =
-      std::make_unique<L1CacheShim>(L1CacheShim::CacheType::InstrCache, this);
+  // Conectar señal del ProcessorTab para detectar cambios en la caché
+  QObject* obj = parent;
+  while (obj && !qobject_cast<ProcessorTab*>(obj))
+    obj = obj->parent();
+  if (auto* processorTab = qobject_cast<ProcessorTab*>(obj)) {
+    connect(processorTab, &ProcessorTab::cacheConfigurationChanged, this, &CacheTabWidget::rebuildCacheTabs);
+  }
 
-  m_l1dShim->setNextLevelCache(m_ui->dataCacheWidget->getCacheSim());
-  m_l1iShim->setNextLevelCache(m_ui->instructionCacheWidget->getCacheSim());
-
-#ifdef N_CACHES_ENABLED
-  m_addTabIdx = m_ui->tabWidget->addTab(new QLabel("Placeholder"),
-                                        QIcon((":/icons/plus.svg")), QString());
-#endif
+  rebuildCacheTabs();
 
   connect(m_ui->tabWidget, &QTabWidget::currentChanged, this,
           &CacheTabWidget::handleTabIndexChanged);
   connect(m_ui->tabWidget, &QTabWidget::tabCloseRequested, this,
           &CacheTabWidget::handleTabCloseRequest);
-
   m_ui->tabWidget->setTabsClosable(true);
-
-  if (auto *tabButton =
-          m_ui->tabWidget->tabBar()->tabButton(0, QTabBar::RightSide)) {
-    // Store default close button size for future use
-    m_defaultTabButtonSize = tabButton->size();
-
-    // Disable closing for L1 caches and add tab
-    tabButton->resize(0, 0);
-    if (auto *tabButton2 =
-            m_ui->tabWidget->tabBar()->tabButton(1, QTabBar::RightSide)) {
-      tabButton2->resize(0, 0);
-    }
-  }
-
-#ifdef N_CACHES_ENABLED
-  if (auto *addTabButton = m_ui->tabWidget->tabBar()->tabButton(
-          m_addTabIdx, QTabBar::RightSide)) {
-    addTabButton->resize(0, 0);
-  }
-#endif
-
-  // Filter out scroll events to avoid mouse scrolling creating a bazillion new
-  // caches
   m_ui->tabWidget->tabBar()->installEventFilter(new ScrollEventFilter(this));
 }
 
+CacheTabWidget::~CacheTabWidget() {
+  delete m_ui;
+}
+
+void CacheTabWidget::rebuildCacheTabs() {
+  qDebug() << "rebuildCacheTabs() called";
+
+  // Limpiar pestañas previas
+  while (m_ui->tabWidget->count() > 0) {
+    QWidget* widget = m_ui->tabWidget->widget(0);
+    m_ui->tabWidget->removeTab(0);
+    delete widget;
+  }
+
+  int rawType = RipesSettings::value("CacheTypeSelected").toInt();
+  CacheConfigType cacheType = static_cast<CacheConfigType>(rawType);
+  qDebug() << "Cache type loaded from settings:" << static_cast<int>(cacheType);
+
+  switch (cacheType) {
+  case CacheConfigType::L1Unified: {
+    m_unifiedShim = std::make_unique<UnifiedCacheShim>(this);
+    m_unifiedCacheWidget = std::make_unique<CacheWidget>(this);
+    m_unifiedShim->setNextLevelCache(m_unifiedCacheWidget->getCacheSim());
+
+    m_ui->tabWidget->addTab(m_unifiedCacheWidget.get(), "L1 Unified");
+    break;
+  }
+  case CacheConfigType::L1Split:
+  default: {
+    auto* dataCacheWidget = new CacheWidget(this);
+    auto* instrCacheWidget = new CacheWidget(this);
+
+    m_l1dShim = std::make_unique<L1CacheShim>(L1CacheShim::CacheType::DataCache, this);
+    m_l1iShim = std::make_unique<L1CacheShim>(L1CacheShim::CacheType::InstrCache, this);
+
+    m_l1dShim->setNextLevelCache(dataCacheWidget->getCacheSim());
+    m_l1iShim->setNextLevelCache(instrCacheWidget->getCacheSim());
+
+    m_ui->tabWidget->addTab(dataCacheWidget, "L1 Data");
+    m_ui->tabWidget->addTab(instrCacheWidget, "L1 Instr");
+
+    if (auto *tabButton = m_ui->tabWidget->tabBar()->tabButton(0, QTabBar::RightSide)) {
+      m_defaultTabButtonSize = tabButton->size();
+      tabButton->resize(0, 0);
+    }
+    if (auto *tabButton2 = m_ui->tabWidget->tabBar()->tabButton(1, QTabBar::RightSide)) {
+      tabButton2->resize(0, 0);
+    }
+    break;
+  }
+  }
+}
+
+void CacheTabWidget::handleTabIndexChanged(int index) {
+  auto *widget = dynamic_cast<CacheWidget *>(m_ui->tabWidget->widget(index));
+  if (widget) {
+    emit cacheFocusChanged(widget);
+  }
+}
+
 void CacheTabWidget::handleTabCloseRequest(int index) {
-  // Only the last-level cache should be closeable
+#ifdef N_CACHES_ENABLED
   Q_ASSERT(index == m_addTabIdx - 1 && index > InstrCache);
   const int newIndex = index - 1;
   m_ui->tabWidget->setCurrentIndex(newIndex);
@@ -91,38 +127,9 @@ void CacheTabWidget::handleTabCloseRequest(int index) {
   }
   m_nextCacheLevel--;
   m_ui->tabWidget->setTabText(m_addTabIdx, QString());
+#else
+  Q_UNUSED(index);
+#endif
 }
-
-void CacheTabWidget::handleTabIndexChanged(int index) {
-  if (index == m_addTabIdx) {
-    // Add new level of cache
-    auto *cw = new CacheWidget(this);
-    m_ui->tabWidget->insertTab(m_addTabIdx, cw,
-                               QString("L%1 Cache").arg(m_nextCacheLevel));
-    m_nextCacheLevel++;
-
-    // The new cache is the deleteable cache, the one below it is thus no longer
-    // deleteable
-    m_ui->tabWidget->tabBar()
-        ->tabButton(m_addTabIdx, QTabBar::RightSide)
-        ->resize(m_defaultTabButtonSize);
-    m_ui->tabWidget->tabBar()
-        ->tabButton(m_addTabIdx - 1, QTabBar::RightSide)
-        ->resize(0, 0);
-    m_addTabIdx = m_ui->tabWidget->count() - 1;
-    m_ui->tabWidget->setCurrentIndex(index);
-  }
-
-  // Locate cacheWidget for the current index
-  for (const auto &ch : m_ui->tabWidget->widget(index)->children()) {
-    auto *cw = dynamic_cast<CacheWidget *>(ch);
-    if (cw) {
-      emit cacheFocusChanged(cw);
-      break;
-    }
-  }
-}
-
-CacheTabWidget::~CacheTabWidget() { delete m_ui; }
 
 } // namespace Ripes
