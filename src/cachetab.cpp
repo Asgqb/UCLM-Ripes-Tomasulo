@@ -1,6 +1,8 @@
 #include "cachetab.h"
 #include "ui_cachetab.h"
 
+#include "cachetabwidget.h"
+
 #include "cachesim/cacheview.h"
 #include "cachesim/cachewidget.h"
 
@@ -45,6 +47,10 @@ void CacheTab::tabVisibilityChanged(bool visible) {
                        [&] { m_ui->cacheTabWidget->flipTabs(); });
     m_initialized = visible;
   }
+}
+
+CacheTabWidget* CacheTab::getCacheTabWidget() const {
+  return m_ui->cacheTabWidget;
 }
 
 CacheTab::~CacheTab() { delete m_ui; }

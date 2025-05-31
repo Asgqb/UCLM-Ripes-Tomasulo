@@ -3,11 +3,13 @@
 
 #include "cachesim/l1cacheshim.h"
 #include "cachesim/unifiedcacheshim.h"
+#include "processortab.h"
 
 // #define N_CACHES_ENABLED
 
 namespace Ripes {
 class CacheWidget;
+class ProcessorTab;
 
 namespace Ui {
 class CacheTabWidget;
@@ -49,6 +51,8 @@ private:
 
   std::unique_ptr<UnifiedCacheShim> m_unifiedShim;
   std::unique_ptr<CacheWidget> m_unifiedCacheWidget;
+
+  ProcessorTab* findProcessorTab();
 };
 
 } // namespace Ripes

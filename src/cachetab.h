@@ -7,6 +7,8 @@
 
 namespace Ripes {
 
+class CacheTabWidget;
+
 namespace Ui {
 class CacheTab;
 }
@@ -19,6 +21,8 @@ public:
   ~CacheTab() override;
 
   void tabVisibilityChanged(bool visible) override;
+
+  CacheTabWidget* getCacheTabWidget() const;
 
 signals:
   void focusAddressChanged(Ripes::AInt address);

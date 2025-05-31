@@ -35,14 +35,6 @@ CacheTabWidget::CacheTabWidget(QWidget *parent)
     : QWidget(parent), m_ui(new Ui::CacheTabWidget) {
   m_ui->setupUi(this);
 
-  // Conectar señal del ProcessorTab para detectar cambios en la caché
-  QObject* obj = parent;
-  while (obj && !qobject_cast<ProcessorTab*>(obj))
-    obj = obj->parent();
-  if (auto* processorTab = qobject_cast<ProcessorTab*>(obj)) {
-    connect(processorTab, &ProcessorTab::cacheConfigurationChanged, this, &CacheTabWidget::rebuildCacheTabs);
-  }
-
   rebuildCacheTabs();
 
   connect(m_ui->tabWidget, &QTabWidget::currentChanged, this,
@@ -130,6 +122,16 @@ void CacheTabWidget::handleTabCloseRequest(int index) {
 #else
   Q_UNUSED(index);
 #endif
+}
+
+ProcessorTab* CacheTabWidget::findProcessorTab() {
+  QWidget* widget = parentWidget();
+  while (widget) {
+    if (auto* processorTab = qobject_cast<ProcessorTab*>(widget))
+      return processorTab;
+    widget = widget->parentWidget();
+  }
+  return nullptr;
 }
 
 } // namespace Ripes

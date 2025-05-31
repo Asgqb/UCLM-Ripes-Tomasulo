@@ -3,6 +3,7 @@
 #include "ui_mainwindow.h"
 
 #include "cachetab.h"
+#include "cachetabwidget.h"
 #include "edittab.h"
 #include "iotab.h"
 #include "loaddialog.h"
@@ -108,6 +109,10 @@ MainWindow::MainWindow(QWidget *parent)
 
   // setup and connect widgets
   connect(editTab, &EditTab::editorStateChanged, [=] { clearSaveFile(); });
+
+  // Conexión explícita entre ProcessorTab y CacheTabWidget
+  connect(processorTab, &ProcessorTab::cacheConfigurationChanged,
+        cacheTab->getCacheTabWidget(), &CacheTabWidget::rebuildCacheTabs);
 
   // Setup status bar
   setupStatusBar();
