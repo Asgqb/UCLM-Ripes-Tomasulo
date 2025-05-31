@@ -545,4 +545,11 @@ void CacheSim::setPreset(const CachePreset &preset) {
   updateConfiguration();
 }
 
+void CacheInterface::setNextLevelCache(const std::shared_ptr<CacheSim>& cache)
+{
+  m_nextLevelCache = cache;
+  if (m_nextLevelCache)              // ya conocemos CacheSim aquí
+    m_nextLevelCache->setParent(nullptr);
+}
+
 } // namespace Ripes

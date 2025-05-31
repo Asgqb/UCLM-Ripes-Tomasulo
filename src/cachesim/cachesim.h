@@ -67,9 +67,7 @@ public:
    * desires to access this cache
    */
   virtual void access(AInt address, MemoryAccess::Type type) = 0;
-  void setNextLevelCache(const std::shared_ptr<CacheSim> &cache) {
-    m_nextLevelCache = cache;
-  }
+  void setNextLevelCache(const std::shared_ptr<CacheSim> &cache);
 
   /**
    * @brief reset
