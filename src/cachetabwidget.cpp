@@ -10,6 +10,7 @@
 #include <QTabBar>
 #include <QWheelEvent>
 #include <QDebug>
+#include <QPointer>
 
 namespace Ripes {
 
@@ -50,13 +51,12 @@ CacheTabWidget::~CacheTabWidget() {
 }
 
 void CacheTabWidget::rebuildCacheTabs() {
-  qDebug() << "rebuildCacheTabs() called";
 
-  // Limpiar pestañas previas
+  // Clean previous tabs
   while (m_ui->tabWidget->count() > 0) {
     QWidget* widget = m_ui->tabWidget->widget(0);
     m_ui->tabWidget->removeTab(0);
-    delete widget;
+    widget->deleteLater();
   }
 
   int rawType = RipesSettings::value("CacheTypeSelected").toInt();
@@ -65,11 +65,18 @@ void CacheTabWidget::rebuildCacheTabs() {
 
   switch (cacheType) {
   case CacheConfigType::L1Unified: {
-    m_unifiedShim = std::make_unique<UnifiedCacheShim>(this);
-    m_unifiedCacheWidget = std::make_unique<CacheWidget>(this);
-    m_unifiedShim->setNextLevelCache(m_unifiedCacheWidget->getCacheSim());
+    auto* unifiedWidget = new CacheWidget(this);
 
-    m_ui->tabWidget->addTab(m_unifiedCacheWidget.get(), "L1 Unified");
+    m_unifiedShim = new UnifiedCacheShim(this);
+    m_unifiedShim->setNextLevelCache(unifiedWidget->getCacheSim());
+
+    m_ui->tabWidget->addTab(unifiedWidget, "L1 Unified");
+
+    if (auto *tabButton = m_ui->tabWidget->tabBar()->tabButton(0, QTabBar::RightSide)) {
+      m_defaultTabButtonSize = tabButton->size();
+      tabButton->resize(0, 0);
+    }
+
     break;
   }
   case CacheConfigType::L1Split:
@@ -77,8 +84,8 @@ void CacheTabWidget::rebuildCacheTabs() {
     auto* dataCacheWidget = new CacheWidget(this);
     auto* instrCacheWidget = new CacheWidget(this);
 
-    m_l1dShim = std::make_unique<L1CacheShim>(L1CacheShim::CacheType::DataCache, this);
-    m_l1iShim = std::make_unique<L1CacheShim>(L1CacheShim::CacheType::InstrCache, this);
+    m_l1dShim = new L1CacheShim(L1CacheShim::CacheType::DataCache, this);
+    m_l1iShim = new L1CacheShim(L1CacheShim::CacheType::InstrCache, this);
 
     m_l1dShim->setNextLevelCache(dataCacheWidget->getCacheSim());
     m_l1iShim->setNextLevelCache(instrCacheWidget->getCacheSim());

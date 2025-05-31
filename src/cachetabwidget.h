@@ -5,6 +5,8 @@
 #include "cachesim/unifiedcacheshim.h"
 #include "processortab.h"
 
+#include <QPointer>
+
 // #define N_CACHES_ENABLED
 
 namespace Ripes {
@@ -46,11 +48,11 @@ private:
   int m_nextCacheLevel = 2;
   QSize m_defaultTabButtonSize;
 
-  std::unique_ptr<L1CacheShim> m_l1dShim;
-  std::unique_ptr<L1CacheShim> m_l1iShim;
+  QPointer<L1CacheShim> m_l1dShim;
+  QPointer<L1CacheShim> m_l1iShim;
 
-  std::unique_ptr<UnifiedCacheShim> m_unifiedShim;
-  std::unique_ptr<CacheWidget> m_unifiedCacheWidget;
+  QPointer<UnifiedCacheShim> m_unifiedShim;
+  QPointer<CacheWidget> m_unifiedCacheWidget;
 
   ProcessorTab* findProcessorTab();
 };
