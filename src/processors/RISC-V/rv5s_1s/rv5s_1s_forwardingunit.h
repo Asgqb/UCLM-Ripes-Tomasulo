@@ -6,7 +6,7 @@
 #include "VSRTL/core/vsrtl_component.h"
 
 namespace Ripes {
-enum class ForwardingSrc_1S { IdStage, ExStage, MemStage, WbStage };
+enum class ForwardingSrc_1S { IdStage, MemStage, WbStage };
 }
 
 namespace vsrtl {
@@ -37,8 +37,6 @@ private:
   ForwardingSrc_1S getFwSrc(VSRTL_VT_U idx) const {
     if (idx == 0) {
       return ForwardingSrc_1S::IdStage;
-    } else if (idx == ex_reg_wr_idx.uValue() && ex_reg_wr_en.uValue()) {
-      return ForwardingSrc_1S::ExStage;
     } else if (idx == mem_reg_wr_idx.uValue() && mem_reg_wr_en.uValue()) {
       return ForwardingSrc_1S::MemStage;
     } else if (idx == wb_reg_wr_idx.uValue() && wb_reg_wr_en.uValue()) {

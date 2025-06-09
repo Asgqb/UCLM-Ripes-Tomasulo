@@ -44,26 +44,26 @@ constexpr const char rv5s_no_hz_desc[] =
     "detection/elimination." no_hz_note;
 constexpr const char rv5s_desc[] =
     "A 5-stage in-order processor with hazard detection/elimination and "
-    "forwarding. Branches are assumed not taken and solved at the MEM stage "
+    "forwarding. Branches are assumed not taken and solved at the EX stage "
     "by default.";
     
 constexpr const char rv5s_2s_db_desc[] =
     "A 5-stage in-order processor with hazard detection/elimination and "
-    "forwarding, with delayed branches solved at the MEM stage."
+    "forwarding, with delayed branches solved at the EX stage."
     delayed_branch_note;
 constexpr const char rv5s_1s_desc[] =
     "A 5-stage in-order processor with hazard detection/elimination and "
-    "forwarding, with branches assumed not taken and solved at the EX stage.";
+    "forwarding, with branches assumed not taken and solved at the ID stage.";
 constexpr const char rv5s_1s_db_desc[] =
     "A 5-stage in-order processor with hazard detection/elimination and "
-    "forwarding, with delayed branches solved at the EX stage."
+    "forwarding, with delayed branches solved at the ID stage."
     delayed_branch_note;
 constexpr const char rv5s_3s_desc[] =
     "A 5-stage in-order processor with hazard detection/elimination and "
-    "forwarding, with branches assumed not taken and solved at the WB stage.";
+    "forwarding, with branches assumed not taken and solved at the MEM stage.";
 constexpr const char rv5s_3s_db_desc[] =
     "A 5-stage in-order processor with hazard detection/elimination and "
-    "forwarding, with delayed branches solved at the WB stage."
+    "forwarding, with delayed branches solved at the MEM stage."
     delayed_branch_note;
 
 constexpr const char rv6s_desc[] =
