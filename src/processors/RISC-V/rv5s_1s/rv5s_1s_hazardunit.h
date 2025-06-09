@@ -17,7 +17,8 @@ public:
     hazardFEEnable << [=] { return !hasHazard(); };
     hazardIDEXEnable << [=] { return !hasEcallHazard(); };
     hazardEXMEMClear << [=] { return hasEcallHazard(); };
-    hazardIDEXClear << [=] { return hasLoadUseHazard(); };
+    hazardIDEXClear << // MODIFIED
+        [=] { return hasLoadUseHazard() || branchHasDataHazard(); };
     stallEcallHandling << [=] { return hasEcallHazard(); };
   }
 
@@ -50,15 +51,19 @@ public:
   // register file before handling the ecall.
   OUTPUTPORT(stallEcallHandling, 1);
 
-  // MODIFIED: enable checking ID stage for branch instruction
-  INPUTPORT_ENUM(id_opcode, RVInstr);
+  // MODIFIED: enable checking ID stage for branch instructions
+  INPUTPORT(id_do_branch, 1);
+  INPUTPORT(id_do_jump, 1);
+
+  // MODIFIED: probe EX stage for dependencies
+  INPUTPORT(ex_do_reg_write, 1);
 
   // MODIFIED: probe MEM stage for dependencies
   INPUTPORT(mem_reg_wr_idx, c_RVRegsBits);
   INPUTPORT(mem_do_mem_read_en, 1);
 
 private:
-  bool hasHazard() { return hasLoadUseHazard() || hasEcallHazard(); }
+  bool hasHazard() { return hasLoadUseHazard() || hasEcallHazard() || branchHasDataHazard(); }
 
   // MODIFIED for load/use hazard detection of branch operands
   bool hasLoadUseHazard() const {
@@ -71,18 +76,22 @@ private:
     const bool ex_do_mem_read = ex_do_mem_read_en.uValue();
     const bool mem_do_mem_read = mem_do_mem_read_en.uValue();
 
-    // there has to be a better way to do this
-    const bool is_branch = id_opcode.eValue<RVInstr>() == RVInstr::JAL
-                        || id_opcode.eValue<RVInstr>() == RVInstr::JALR
-                        || id_opcode.eValue<RVInstr>() == RVInstr::BEQ
-                        || id_opcode.eValue<RVInstr>() == RVInstr::BNE
-                        || id_opcode.eValue<RVInstr>() == RVInstr::BGE
-                        || id_opcode.eValue<RVInstr>() == RVInstr::BLT
-                        || id_opcode.eValue<RVInstr>() == RVInstr::BGEU
-                        || id_opcode.eValue<RVInstr>() == RVInstr::BLTU;
+    const bool is_branch = id_do_branch || id_do_jump;
 
     return ((ex_idx == idx1 || ex_idx == idx2) && ex_do_mem_read)
         || ((mem_idx == idx1 || mem_idx == idx2) && mem_do_mem_read && is_branch);
+  }
+
+  // MODIFIED: detect regular data hazards for branch operands
+  bool branchHasDataHazard() const {
+    const unsigned ex_idx = ex_reg_wr_idx.uValue();
+    const unsigned idx1 = id_reg1_idx.uValue();
+    const unsigned idx2 = id_reg2_idx.uValue();
+    
+    const bool ex_writes = ex_do_reg_write.uValue() && ex_idx != 0;
+    const bool is_branch = id_do_branch || id_do_jump;
+    
+    return (ex_idx == idx1 || ex_idx == idx2) && ex_writes && is_branch;
   }
 
   bool hasEcallHazard() const {

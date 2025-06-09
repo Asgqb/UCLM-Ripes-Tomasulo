@@ -113,13 +113,13 @@ public:
 
     // branch forwarding source selection
     registerFile->r1_out >> branch_op1_src->get(ForwardingSrc_1S::IdStage);
-    alu->res >> branch_op1_src->get(ForwardingSrc_1S::ExStage);
+    // alu->res >> branch_op1_src->get(ForwardingSrc_1S::ExStage);
     exmem_reg->alures_out >> branch_op1_src->get(ForwardingSrc_1S::MemStage);
     reg_wr_src->out >> branch_op1_src->get(ForwardingSrc_1S::WbStage);
     funit->branch_op1_fwctrl >> branch_op1_src->select;
 
     registerFile->r2_out >> branch_op2_src->get(ForwardingSrc_1S::IdStage);
-    alu->res >> branch_op2_src->get(ForwardingSrc_1S::ExStage);
+    // alu->res >> branch_op2_src->get(ForwardingSrc_1S::ExStage);
     exmem_reg->alures_out >> branch_op2_src->get(ForwardingSrc_1S::MemStage);
     reg_wr_src->out >> branch_op2_src->get(ForwardingSrc_1S::WbStage);
     funit->branch_op2_fwctrl >> branch_op2_src->select;
@@ -309,6 +309,9 @@ public:
     // MODIFIED: load-use hazard detection for branch operands
     exmem_reg->mem_do_read_out >> hzunit->mem_do_mem_read_en;
     exmem_reg->wr_reg_idx_out >> hzunit->mem_reg_wr_idx;
+    idex_reg->reg_do_write_out >> hzunit->ex_do_reg_write;
+    control->do_branch >> hzunit->id_do_branch;
+    control->do_jump >> hzunit->id_do_jump;
 
     idex_reg->mem_do_read_out >> hzunit->ex_do_mem_read_en;
     idex_reg->wr_reg_idx_out >> hzunit->ex_reg_wr_idx;
@@ -318,7 +321,6 @@ public:
     memwb_reg->reg_do_write_out >> hzunit->wb_do_reg_write;
 
     idex_reg->opcode_out >> hzunit->opcode;
-    decode->opcode >> hzunit->id_opcode;
   }
 
   // Design subcomponents
