@@ -320,7 +320,8 @@ void ProcessorTab::updateStatistics() {
   QString cpiText, ipcText;
   if (cycleCount != 0 && instrsRetired != 0) {
     const double cpi =
-        static_cast<double>(cycleCount) / static_cast<double>(instrsRetired);
+        // MODIFIED: adjust for 1-based cycle count; see also cli/telemetry.h
+        static_cast<double>(cycleCount-1) / static_cast<double>(instrsRetired);
     const double ipc = 1 / cpi;
     cpiText = QString::number(cpi, 'g', 3);
     ipcText = QString::number(ipc, 'g', 3);
