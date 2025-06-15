@@ -3,7 +3,7 @@
  <class>Ripes::CacheSelectionDialog</class>
  <widget class="QDialog" name="Ripes::CacheSelectionDialog">
   <property name="windowTitle">
-   <string>Select Cache Configuration</string>
+   <string>Select Cache Type</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>

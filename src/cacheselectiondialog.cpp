@@ -10,7 +10,7 @@ namespace Ripes {
 CacheSelectionDialog::CacheSelectionDialog(QWidget *parent)
     : QDialog(parent), m_ui(new Ui::CacheSelectionDialog) {
   m_ui->setupUi(this);
-  setWindowTitle("Select Cache Configuration");
+  setWindowTitle("Select Cache Type");
 
   m_ui->cacheTree->setHeaderHidden(true);
 
