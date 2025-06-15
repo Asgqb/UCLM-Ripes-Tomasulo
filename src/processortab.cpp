@@ -205,7 +205,7 @@ void ProcessorTab::setupSimulatorActions(QToolBar *controlToolbar) {
           &ProcessorTab::processorSelection);
   controlToolbar->addAction(m_selectProcessorAction);
  
-  const QIcon cacheIcon = QIcon(":/icons/server.svg");
+  const QIcon cacheIcon = QIcon(":/icons/hierarchy_test.svg");
   m_selectCacheAction =
       new QAction(cacheIcon, "Select cache", this);
   connect(m_selectCacheAction, &QAction::triggered, this,
