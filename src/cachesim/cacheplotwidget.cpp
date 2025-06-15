@@ -536,12 +536,4 @@ void CachePlotWidget::updateHitrate() {
   m_ui->writebacks->setText(QString::number(m_cache->getWritebacks()));
 }
 
-// a ver si carga la tabla
-/*
-void CachePlotWidget::setScene(QGraphicsScene* scene) {
-  m_graphicsView->setScene(scene);  // suponiendo que usas QGraphicsView* m_graphicsView;
-}
-*/
-
-
 } // namespace Ripes

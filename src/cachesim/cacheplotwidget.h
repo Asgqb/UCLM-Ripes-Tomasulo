@@ -3,7 +3,6 @@
 #include <QMetaType>
 #include <QWidget>
 #include <QtCharts/QChartGlobal>
-// #include <QGraphicsScene>
 
 
 #include "cachesim.h"
