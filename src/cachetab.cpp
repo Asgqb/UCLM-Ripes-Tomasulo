@@ -43,10 +43,13 @@ void CacheTab::tabVisibilityChanged(bool visible) {
    * has calculated widget sizes when the cache tab is first shown.
    */
   if (!m_initialized && visible) {
-    QTimer::singleShot(100, m_ui->cacheTabWidget,
-                       [&] { m_ui->cacheTabWidget->flipTabs(); });
+    QTimer::singleShot(0, m_ui->cacheTabWidget, [&] {
+        m_ui->cacheTabWidget->rebuildCacheTabs();
+        m_ui->cacheTabWidget->flipTabs();
+    });
     m_initialized = visible;
   }
+
 }
 
 CacheTabWidget* CacheTab::getCacheTabWidget() const {

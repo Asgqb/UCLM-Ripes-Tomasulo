@@ -36,8 +36,6 @@ CacheTabWidget::CacheTabWidget(QWidget *parent)
     : QWidget(parent), m_ui(new Ui::CacheTabWidget) {
   m_ui->setupUi(this);
 
-  rebuildCacheTabs();
-
   connect(m_ui->tabWidget, &QTabWidget::currentChanged, this,
           &CacheTabWidget::handleTabIndexChanged);
   connect(m_ui->tabWidget, &QTabWidget::tabCloseRequested, this,
@@ -60,7 +58,13 @@ void CacheTabWidget::rebuildCacheTabs() {
   }
 
   int rawType = RipesSettings::value("CacheTypeSelected").toInt();
-  CacheConfigType cacheType = static_cast<CacheConfigType>(rawType);
+  CacheConfigType cacheType = CacheConfigType::L1Split;
+  if (rawType >= static_cast<int>(CacheConfigType::L1Split) &&
+      rawType <= static_cast<int>(CacheConfigType::Multilevel)) {
+      cacheType = static_cast<CacheConfigType>(rawType);
+  } else {
+      RipesSettings::setValue("CacheTypeSelected", static_cast<int>(cacheType));
+  }
   qDebug() << "Cache type loaded from settings:" << static_cast<int>(cacheType);
 
   switch (cacheType) {
