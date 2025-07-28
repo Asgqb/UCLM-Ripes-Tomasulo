@@ -72,8 +72,7 @@ void PipelineDiagramModel::prepareForView() {
 }
 
 void PipelineDiagramModel::gatherStageInfo() {
-  // MODIFIED: adjust for processor cycles indexing from one
-  long long cycleCount = ProcessorHandler::getProcessor()->getCycleCount() - 1;
+  long long cycleCount = ProcessorHandler::getProcessor()->getCycleCount();
   auto stageInfoForCycle = m_cycleStageInfos.find(cycleCount);
   if (stageInfoForCycle != m_cycleStageInfos.end()) {
     // Already gathered stage info for this cycle.

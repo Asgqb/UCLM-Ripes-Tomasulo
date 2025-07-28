@@ -37,8 +37,7 @@ public:
   long long getInstructionsRetired() const override {
     return m_instructionsRetired;
   }
-  // MODIFIED: count cycles from one instead of zero
-  long long getCycleCount() const override { return m_cycleCount + 1; }
+  long long getCycleCount() const override { return m_cycleCount; }
   void setMaxReverseCycles(unsigned cycles) override {
     setReverseStackSize(cycles);
   }
