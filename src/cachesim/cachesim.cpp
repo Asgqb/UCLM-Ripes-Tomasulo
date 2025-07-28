@@ -280,6 +280,9 @@ void CacheSim::access(AInt address, MemoryAccess::Type type) {
          getWriteAllocPolicy() == WriteAllocPolicy::WriteAllocate)) {
       oldWay = evictAndUpdate(transaction);
     }
+    if (m_nextLevelCache) {
+          m_nextLevelCache->access(address, type);
+    }
   } else {
     oldWay = m_cacheLines[transaction.index.line][transaction.index.way];
   }

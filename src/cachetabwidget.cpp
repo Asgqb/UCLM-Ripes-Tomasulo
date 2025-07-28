@@ -106,6 +106,40 @@ void CacheTabWidget::rebuildCacheTabs() {
     }
     break;
   }
+
+case CacheConfigType::Multilevel: {
+
+    // Crear L2 CacheSim
+    auto l2CacheSim = std::make_shared<CacheSim>(this);
+
+    // Crear widgets
+    auto* l1Widget = new CacheWidget(this);
+    auto* l2Widget = new CacheWidget(this, l2CacheSim);
+
+    // Encadenar caches
+    auto l1Cache = l1Widget->getCacheSim();
+    l1Cache->setNextLevelCache(l2CacheSim);
+
+    // Crear shim unificado
+    m_unifiedShim = new UnifiedCacheShim(this);
+    m_unifiedShim->setNextLevelCache(l1Cache);
+
+    // Añadir pestañas
+    m_ui->tabWidget->addTab(l1Widget, "L1 Unified");
+    m_ui->tabWidget->addTab(l2Widget, "L2 Unified");
+
+    // Ocultar botones
+    if (auto *tabButton = m_ui->tabWidget->tabBar()->tabButton(0, QTabBar::RightSide)) {
+        m_defaultTabButtonSize = tabButton->size();
+        tabButton->resize(0, 0);
+    }
+    if (auto *tabButton2 = m_ui->tabWidget->tabBar()->tabButton(1, QTabBar::RightSide)) {
+        tabButton2->resize(0, 0);
+    }
+
+    break;
+    }
+
   }
 }
 
