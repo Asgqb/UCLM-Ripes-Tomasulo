@@ -49,7 +49,7 @@ class CPITelemetry : public Telemetry {
     const auto instrsRetired =
         ProcessorHandler::getProcessor()->getInstructionsRetired();
     const double cpi =
-        static_cast<double>(cycleCount-1) / static_cast<double>(instrsRetired);
+        static_cast<double>(cycleCount) / static_cast<double>(instrsRetired);
     return cpi;
   }
 };
@@ -65,7 +65,7 @@ class IPCTelemetry : public Telemetry {
     const auto instrsRetired =
         ProcessorHandler::getProcessor()->getInstructionsRetired();
     const double cpi =
-        static_cast<double>(cycleCount-1) / static_cast<double>(instrsRetired);
+        static_cast<double>(cycleCount) / static_cast<double>(instrsRetired);
     const double ipc = 1 / cpi;
     return ipc;
   }
