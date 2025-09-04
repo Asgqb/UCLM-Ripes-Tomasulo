@@ -116,15 +116,22 @@ constexpr const ProcessorTags rv5s_1s_tags = {
 constexpr const ProcessorTags rv5s_1s_db_tags = {
     DatapathType::P_5S, BranchStrategy::DB, BranchDelaySlots::ONE, true, true};
 constexpr const ProcessorTags rv5s_3s_tags = {
-    DatapathType::P_5S, BranchStrategy::PNT, BranchDelaySlots::THREE,
-	true, true};
+    DatapathType::P_5S, BranchStrategy::PNT, BranchDelaySlots::THREE, true,
+    true};
 constexpr const ProcessorTags rv5s_3s_db_tags = {
-    DatapathType::P_5S, BranchStrategy::DB, BranchDelaySlots::THREE,
-	true, true};
+    DatapathType::P_5S, BranchStrategy::DB, BranchDelaySlots::THREE, true,
+    true};
 
 constexpr const ProcessorTags rv6s_tags = {
     DatapathType::P_6SD, BranchStrategy::PNT, BranchDelaySlots::THREE,
     true, true};
+
+constexpr const ProcessorTags rv5mc_1m_tags = {
+    DatapathType::M_5S1, BranchStrategy::N_A, BranchDelaySlots::NONE, false,
+    false};
+constexpr const ProcessorTags rv5mc_2m_tags = {
+    DatapathType::M_5S2, BranchStrategy::N_A, BranchDelaySlots::NONE, false,
+    false};
 
 ProcessorRegistry::ProcessorRegistry() {
   // Initialize processors
@@ -157,10 +164,10 @@ ProcessorRegistry::ProcessorRegistry() {
   defRegVals = {{RVISA::GPR, {{2, 0x7ffffff0}, {3, 0x10000000}}}};
   addProcessor(ProcInfo<vsrtl::core::RV5MC2M<uint32_t>>(
       ProcessorID::RV32_5MC_2M, "Multi-cycle processor with separate memories",
-      rv5mc_desc, layouts, defRegVals));
+      rv5mc_desc, rv5mc_2m_tags, layouts, defRegVals));
   addProcessor(ProcInfo<vsrtl::core::RV5MC2M<uint64_t>>(
       ProcessorID::RV64_5MC, "Multi-cycle processor with separate memories",
-      rv5mc_desc, layouts, defRegVals));
+      rv5mc_desc, rv5mc_2m_tags, layouts, defRegVals));
 
   // RISC-V multicycle, one memory
   layouts = {{"Extended",
@@ -173,10 +180,10 @@ ProcessorRegistry::ProcessorRegistry() {
   defRegVals = {{RVISA::GPR, {{2, 0x7ffffff0}, {3, 0x10000000}}}};
   addProcessor(ProcInfo<vsrtl::core::RV5MC1M<uint32_t>>(
       ProcessorID::RV32_5MC_1M, "Multi-cycle processor with one memory",
-      rv5mc_desc_1m, layouts, defRegVals));
+      rv5mc_desc_1m, rv5mc_1m_tags, layouts, defRegVals));
   addProcessor(ProcInfo<vsrtl::core::RV5MC1M<uint64_t>>(
       ProcessorID::RV64_5MC_1M, "Multi-cycle processor with one memory",
-      rv5mc_desc_1m, layouts, defRegVals));
+      rv5mc_desc_1m, rv5mc_1m_tags, layouts, defRegVals));
 
   // RISC-V 5-stage without forwarding or hazard detection
   layouts = {
