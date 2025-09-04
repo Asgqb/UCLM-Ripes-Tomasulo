@@ -25,6 +25,8 @@ QString enumToString(T value) {
 // configuration dialog.
 enum ProcessorID {
   RV32_SS,
+  RV32_5MC_2M,
+  RV32_5MC_1M,
   RV32_5S_NO_FW_HZ,
   RV32_5S_NO_HZ,
   RV32_5S_NO_FW,
@@ -37,6 +39,8 @@ enum ProcessorID {
   RV32_6S_DUAL,
 
   RV64_SS,
+  RV64_5MC,
+  RV64_5MC_1M,
   RV64_5S_NO_FW_HZ,
   RV64_5S_NO_HZ,
   RV64_5S_NO_FW,
@@ -74,11 +78,13 @@ struct Layout {
 };
 
 // Processor tags
-enum DatapathType { SS, P_5S, P_6SD };
+enum DatapathType { SS, M_5S1, M_5S2, P_5S, P_6SD };
 const static std::map<DatapathType, QString> DatapathNames = {
     {DatapathType::SS, "Single-stage"},
-    {DatapathType::P_5S, "Five-stage"},
-    {DatapathType::P_6SD, "Six-stage dual-issue"}};
+    {DatapathType::M_5S1, "Five-stage multicycle (single memory)"},
+    {DatapathType::M_5S2, "Five-stage multicycle (separate memories)"},
+    {DatapathType::P_5S, "Five-stage segmented"},
+    {DatapathType::P_6SD, "Six-stage dual-issue superscalar"}};
 
 enum BranchStrategy { N_A, PNT, DB };
 const static std::map<BranchStrategy, QString> BranchNames = {

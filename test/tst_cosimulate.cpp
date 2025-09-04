@@ -98,6 +98,8 @@ private slots:
 
   void testRV5S1S() { cosimulate(ProcessorID::RV32_5S_1S, {"M"}); }
   void testRV5S3S() { cosimulate(ProcessorID::RV32_5S_3S, {"M"}); }
+  void testRV5MC2M() { cosimulate(ProcessorID::RV32_5MC_2M, {"M"}); }
+  void testRV5MC1M() { cosimulate(ProcessorID::RV32_5MC_1M, {"M"}); }
 };
 
 void tst_Cosimulate::trapHandler() {
@@ -200,7 +202,7 @@ void tst_Cosimulate::executeSimulator(Trace &trace, const Trace *refTrace) {
   // Override the ProcessorHandler's ECALL handling. In doing so, we can hook
   // into when the EXIT syscall was executed, to verify whether the correct test
   // value was reached.
-  ProcessorHandler::get()->getProcessorNonConst()->trapHandler = [=] {
+  ProcessorHandler::get()->getProcessorNonConst()->trapHandler = [this] {
     trapHandler();
   };
 

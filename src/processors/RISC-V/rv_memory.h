@@ -19,7 +19,7 @@ public:
     data_in >> mem->data_in;
 
     wr_width->setSensitiveTo(&op);
-    wr_width->out << [=] {
+    wr_width->out << [this] {
       switch (op.eValue<MemOp>()) {
       case MemOp::SB:
         return 1;
@@ -35,7 +35,7 @@ public:
     };
     wr_width->out >> mem->wr_width;
 
-    data_out << [=] {
+    data_out << [this] {
       const auto &value = mem->data_out.uValue();
       switch (op.eValue<MemOp>()) {
       case MemOp::LB:
@@ -58,10 +58,7 @@ public:
     };
   }
 
-  void setMemory(AddressSpace *addressSpace) {
-    setMemory(addressSpace);
-    mem->setMemory(addressSpace);
-  }
+  void setMemory(AddressSpace *addressSpace) { mem->setMemory(addressSpace); }
 
   // RVMemory is also a BaseMemory... A bit redundant, but RVMemory has a notion
   // of the memory operation that is happening, while the underlying

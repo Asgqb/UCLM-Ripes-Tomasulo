@@ -104,7 +104,7 @@ ProcessorSelectionDialog::ProcessorSelectionDialog(QWidget *parent)
       chkbox->setChecked(true);
     }
     // Connect checkbox toggle events
-    connect(chkbox, &QCheckBox::toggled, this, [=](bool toggled) {
+    connect(chkbox, &QCheckBox::toggled, this, [this, ext](bool toggled) {
       if (toggled) {
         m_selectedExtensionsForID[m_selectedID] << ext;
       } else {
@@ -239,7 +239,7 @@ void ProcessorSelectionDialog::updateDialog(ISA isa, ProcessorTags tags) {
     if (m_selectedExtensionsForID[desc.id].contains(ext)) {
       chkbox->setChecked(true);
     }
-    connect(chkbox, &QCheckBox::toggled, this, [=](bool toggled) {
+    connect(chkbox, &QCheckBox::toggled, this, [this, ext](bool toggled) {
       if (toggled) {
         m_selectedExtensionsForID[m_selectedID] << ext;
       } else {

@@ -14,12 +14,12 @@ public:
       : Component(name, parent) {
     // tried doing this leveraging inheritance but couldn't assign these
     // outputs to the child class' functions. pls help no hablo c++
-    hazardFEEnable << [=] { return !hasHazard(); };
-    hazardIDEXEnable << [=] { return !hasEcallHazard(); };
-    hazardEXMEMClear << [=] { return hasEcallHazard(); };
+    hazardFEEnable << [this] { return !hasHazard(); };
+    hazardIDEXEnable << [this] { return !hasEcallHazard(); };
+    hazardEXMEMClear << [this] { return hasEcallHazard(); };
     hazardIDEXClear << // MODIFIED
-        [=] { return hasLoadUseHazard() || branchHasDataHazard(); };
-    stallEcallHandling << [=] { return hasEcallHazard(); };
+        [this] { return hasLoadUseHazard() || branchHasDataHazard(); };
+    stallEcallHandling << [this] { return hasEcallHazard(); };
   }
 
   INPUTPORT(id_reg1_idx, c_RVRegsBits);

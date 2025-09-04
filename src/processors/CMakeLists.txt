@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.9)
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Allow linking parent libraries with libraries defined in subdirectories
@@ -53,6 +53,8 @@ endmacro()
 # RISC-V Processors
 create_isa_lib(RISC-V)
 create_vsrtl_processor(RISC-V rvss)
+create_vsrtl_processor(RISC-V rv5mc)
+create_vsrtl_processor(RISC-V rv5mc1m)
 create_vsrtl_processor(RISC-V rv5s)
 create_vsrtl_processor(RISC-V rv5s_1s)
 create_vsrtl_processor(RISC-V rv5s_1s_db)

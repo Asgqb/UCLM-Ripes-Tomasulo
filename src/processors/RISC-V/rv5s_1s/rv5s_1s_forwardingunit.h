@@ -17,8 +17,8 @@ class ForwardingUnit_1S : public ForwardingUnit {
 public:
   ForwardingUnit_1S(const std::string &name, SimComponent *parent)
       : ForwardingUnit(name, parent ) {
-    branch_op1_fwctrl << [=] { return getFwSrc(if_reg1_idx.uValue()); };
-    branch_op2_fwctrl << [=] { return getFwSrc(if_reg2_idx.uValue()); };
+    branch_op1_fwctrl << [this] { return getFwSrc(if_reg1_idx.uValue()); };
+    branch_op2_fwctrl << [this] { return getFwSrc(if_reg2_idx.uValue()); };
   }
 
   // used to determine what registers are needed for branches
