@@ -116,6 +116,13 @@ private slots:
     runTests(ProcessorID::RV32_5S_3S, {"M", "C"},
              {RISCV32_TEST_DIR, RISCV32_C_TEST_DIR});
   }
+  
+  void testRV32_5MultiCycle2Memory() {
+    runTests(ProcessorID::RV32_5MC_2M, {"M"}, {RISCV32_TEST_DIR});
+  }
+  void testRV32_5MultiCycle1Memory() {
+    runTests(ProcessorID::RV32_5MC_1M, {"M"}, {RISCV32_TEST_DIR});
+  }
 };
 
 bool tst_RISCV::skipTest(const QString &test) {
@@ -233,7 +240,7 @@ void tst_RISCV::runTests(const ProcessorID &id, const QStringList &extensions,
 
       // Override the ProcessorHandler's ECALL Exit2 handling. In doing so, we
       // verify whether the correct test value was reached.
-      ProcessorHandler::getProcessorNonConst()->trapHandler = [=] {
+      ProcessorHandler::getProcessorNonConst()->trapHandler = [this] {
         if (ProcessorHandler::getProcessor()->getRegister(
                 RVISA::GPR, s_ecallopreg) == RVABI::Exit2) {
           trapHandler();
