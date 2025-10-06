@@ -89,7 +89,7 @@
             <item row="4" column="0">
              <widget class="QLabel" name="label_4">
               <property name="text">
-               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;2&lt;span style=&quot; vertical-align:super;&quot;&gt;N&lt;/span&gt; Lines:&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;2&lt;span style=&quot; vertical-align:super;&quot;&gt;N&lt;/span&gt; Sets:&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
               </property>
              </widget>
             </item>
@@ -153,6 +153,9 @@
                 <horstretch>0</horstretch>
                 <verstretch>0</verstretch>
                </sizepolicy>
+              </property>
+              <property name="minimum">
+               <number>1</number>
               </property>
               <property name="maximum">
                <number>32</number>

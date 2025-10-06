@@ -83,7 +83,7 @@ const static std::map<DatapathType, QString> DatapathNames = {
     {DatapathType::SS, "Single-stage"},
     {DatapathType::M_5S1, "Five-stage multicycle (single memory)"},
     {DatapathType::M_5S2, "Five-stage multicycle (separate memories)"},
-    {DatapathType::P_5S, "Five-stage segmented"},
+    {DatapathType::P_5S, "Five-stage pipelined"},
     {DatapathType::P_6SD, "Six-stage dual-issue superscalar"}};
 
 enum BranchStrategy { N_A, PNT, DB };
