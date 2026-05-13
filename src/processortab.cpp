@@ -23,6 +23,9 @@
 #include "cachesim/cachetypes.h"
 #include "syscall/systemio.h"
 
+#include "tomasulo/tomasulo.h"
+#include <QLayout>
+
 #include "VSRTL/graphics/vsrtl_widget.h"
 
 #include "processors/interface/ripesprocessor.h"
@@ -72,6 +75,19 @@ ProcessorTab::ProcessorTab(QToolBar *controlToolbar,
   m_ui->setupUi(this);
 
   m_vsrtlWidget = m_ui->vsrtlWidget;
+
+  auto* vsrtlParent = m_ui->vsrtlWidget->parentWidget();
+
+  m_tomasuloWidget = new TomasuloWidget(vsrtlParent);
+
+  if (vsrtlParent && vsrtlParent->layout()) {
+      auto* oldItem =
+          vsrtlParent->layout()->replaceWidget(m_ui->vsrtlWidget,
+                                              m_tomasuloWidget);
+      delete oldItem;
+  }
+
+  m_ui->vsrtlWidget->hide();
 
   if (ProcessorHandler::isVSRTLProcessor()) {
     // Load the default constructed processor to the VSRTL widget. Do a bit of

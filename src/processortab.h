@@ -24,6 +24,7 @@ class ProcessorTab;
 class InstructionModel;
 class RegisterModel;
 class PipelineDiagramModel;
+class TomasuloWidget;
 struct Layout;
 
 class ProcessorTab : public RipesTab {
@@ -74,6 +75,7 @@ private:
   Ui::ProcessorTab *m_ui = nullptr;
   InstructionModel *m_instrModel = nullptr;
   PipelineDiagramModel *m_stageModel = nullptr;
+  TomasuloWidget *m_tomasuloWidget = nullptr;
 
   vsrtl::VSRTLWidget *m_vsrtlWidget = nullptr;
 
