@@ -1,14 +1,19 @@
 #include "processortab.h"
 #include "ui_processortab.h"
 
+#include <QDebug>
 #include <QDir>
 #include <QFontMetrics>
+#include <QLayout>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QScrollBar>
 #include <QSpinBox>
+#include <QSplitter>
 #include <QTemporaryFile>
 
+#include "cacheselectiondialog.h"
+#include "cachesim/cachetypes.h"
 #include "consolewidget.h"
 #include "instructionmodel.h"
 #include "pipelinediagrammodel.h"
@@ -16,15 +21,11 @@
 #include "processorhandler.h"
 #include "processorregistry.h"
 #include "processorselectiondialog.h"
-#include "cacheselectiondialog.h"
 #include "registercontainerwidget.h"
 #include "registermodel.h"
 #include "ripessettings.h"
-#include "cachesim/cachetypes.h"
 #include "syscall/systemio.h"
-
 #include "tomasulo/tomasulo.h"
-#include <QLayout>
 
 #include "VSRTL/graphics/vsrtl_widget.h"
 
@@ -76,18 +77,51 @@ ProcessorTab::ProcessorTab(QToolBar *controlToolbar,
 
   m_vsrtlWidget = m_ui->vsrtlWidget;
 
-  auto* vsrtlParent = m_ui->vsrtlWidget->parentWidget();
+  m_tomasuloWidget = new TomasuloWidget;
+  m_tomasuloWidget->setMinimumHeight(430);
 
-  m_tomasuloWidget = new TomasuloWidget(vsrtlParent);
+  bool replaced = false;
 
-  if (vsrtlParent && vsrtlParent->layout()) {
-      auto* oldItem =
-          vsrtlParent->layout()->replaceWidget(m_ui->vsrtlWidget,
-                                              m_tomasuloWidget);
-      delete oldItem;
+  // Intento principal: reemplazar el VSRTLWidget directamente dentro del
+  // splitter vertical que separa la vista del procesador de la consola.
+  const int vsrtlIndex = m_ui->pipelinesplitter->indexOf(m_ui->vsrtlWidget);
+
+  if (vsrtlIndex >= 0) {
+    QWidget *oldWidget =
+        m_ui->pipelinesplitter->replaceWidget(vsrtlIndex, m_tomasuloWidget);
+
+    if (oldWidget) {
+      oldWidget->hide();
+
+      // No borramos el VSRTLWidget porque Ripes todavía lo usa internamente
+      // para cargar el procesador, sincronizar, resetear, etc.
+      oldWidget->setParent(this);
+    }
+
+    replaced = true;
   }
 
-  m_ui->vsrtlWidget->hide();
+  // Fallback: por si el widget no estuviera directamente en pipelinesplitter.
+  if (!replaced) {
+    auto *vsrtlParent = m_ui->vsrtlWidget->parentWidget();
+
+    if (vsrtlParent && vsrtlParent->layout()) {
+      auto *oldItem =
+          vsrtlParent->layout()->replaceWidget(m_ui->vsrtlWidget,
+                                               m_tomasuloWidget,
+                                               Qt::FindChildrenRecursively);
+
+      if (oldItem) {
+        delete oldItem;
+        m_ui->vsrtlWidget->hide();
+        replaced = true;
+      }
+    }
+  }
+
+  if (!replaced) {
+    qDebug() << "No se ha podido reemplazar vsrtlWidget por TomasuloWidget";
+  }
 
   if (ProcessorHandler::isVSRTLProcessor()) {
     // Load the default constructed processor to the VSRTL widget. Do a bit of
@@ -158,9 +192,10 @@ ProcessorTab::ProcessorTab(QToolBar *controlToolbar,
   connect(ProcessorHandler::get(), &ProcessorHandler::stopping, this,
           &ProcessorTab::pause);
 
-  // Make processor view stretch wrt. consoles
-  m_ui->pipelinesplitter->setStretchFactor(0, 1);
-  m_ui->pipelinesplitter->setStretchFactor(1, 0);
+  // Make Tomasulo view take more vertical space than the console.
+  m_ui->pipelinesplitter->setStretchFactor(0, 3);
+  m_ui->pipelinesplitter->setStretchFactor(1, 2);
+  m_ui->pipelinesplitter->setSizes(QList<int>{460, 260});
 
   // Make processor view stretch wrt. right side tabs
   m_ui->viewSplitter->setStretchFactor(0, 1);
@@ -220,10 +255,9 @@ void ProcessorTab::setupSimulatorActions(QToolBar *controlToolbar) {
   connect(m_selectProcessorAction, &QAction::triggered, this,
           &ProcessorTab::processorSelection);
   controlToolbar->addAction(m_selectProcessorAction);
- 
+
   const QIcon cacheIcon = QIcon(":/icons/hierarchy_test.svg");
-  m_selectCacheAction =
-      new QAction(cacheIcon, "Select cache", this);
+  m_selectCacheAction = new QAction(cacheIcon, "Select cache", this);
   connect(m_selectCacheAction, &QAction::triggered, this,
           &ProcessorTab::cacheSelection);
   controlToolbar->addAction(m_selectCacheAction);
@@ -428,17 +462,15 @@ void ProcessorTab::processorSelection() {
   }
 }
 
-
 void ProcessorTab::cacheSelection() {
   CacheSelectionDialog dialog;
   if (dialog.exec() == QDialog::Accepted) {
     CacheConfigType selectedType = dialog.getSelectedCacheType();
-    RipesSettings::setValue("CacheTypeSelected", static_cast<int>(selectedType));
+    RipesSettings::setValue("CacheTypeSelected",
+                            static_cast<int>(selectedType));
     qDebug() << "Cache type selected:" << static_cast<int>(selectedType);
-    //ProcessorHandler::reset(); // para forzar el reinicio por si acaso es necesario
-    
+
     emit cacheConfigurationChanged();
-    
   }
 }
 
@@ -631,4 +663,5 @@ void ProcessorTab::showPipelineDiagram() {
   auto w = PipelineDiagramWidget(m_stageModel);
   w.exec();
 }
+
 } // namespace Ripes
