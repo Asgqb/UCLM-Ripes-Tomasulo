@@ -1,5 +1,7 @@
-#include "processortab.h"
+﻿#include "processortab.h"
 #include "ui_processortab.h"
+
+#include <cstdint>
 
 #include <QDebug>
 #include <QDir>
@@ -32,6 +34,7 @@
 #include "ripessettings.h"
 #include "syscall/systemio.h"
 #include "tomasulo/tomasulo.h"
+#include "tomasulo/tomasulo_engine.h"
 
 #include "VSRTL/graphics/vsrtl_widget.h"
 
@@ -332,6 +335,32 @@ void ProcessorTab::setupTomasuloOptionsWidget() {
 
   resetTomasuloOptionsToDefaults();
 
+  auto reloadTomasuloOnConfigChange = [this](int) {
+    if (m_usingTomasulo && m_tomasuloWidget) {
+      reloadTomasuloProgram();
+    }
+  };
+
+  connect(m_tomasuloEffAddrBuffers, qOverload<int>(&QSpinBox::valueChanged),
+          this, reloadTomasuloOnConfigChange);
+  connect(m_tomasuloFpAddBuffers, qOverload<int>(&QSpinBox::valueChanged), this,
+          reloadTomasuloOnConfigChange);
+  connect(m_tomasuloFpMulBuffers, qOverload<int>(&QSpinBox::valueChanged), this,
+          reloadTomasuloOnConfigChange);
+  connect(m_tomasuloIntBuffers, qOverload<int>(&QSpinBox::valueChanged), this,
+          reloadTomasuloOnConfigChange);
+  connect(m_tomasuloReorderBuffers, qOverload<int>(&QSpinBox::valueChanged),
+          this, reloadTomasuloOnConfigChange);
+
+  connect(m_tomasuloFpAddLatency, qOverload<int>(&QSpinBox::valueChanged), this,
+          reloadTomasuloOnConfigChange);
+  connect(m_tomasuloFpSubLatency, qOverload<int>(&QSpinBox::valueChanged), this,
+          reloadTomasuloOnConfigChange);
+  connect(m_tomasuloFpMulLatency, qOverload<int>(&QSpinBox::valueChanged), this,
+          reloadTomasuloOnConfigChange);
+  connect(m_tomasuloFpDivLatency, qOverload<int>(&QSpinBox::valueChanged), this,
+          reloadTomasuloOnConfigChange);
+
   // En processortab.ui, horizontalLayout_2 contiene:
   //   0 -> Console/Memory tab widget
   //   1 -> Execution info
@@ -368,15 +397,80 @@ void ProcessorTab::resetTomasuloOptionsToDefaults() {
   m_tomasuloFpDivLatency->setValue(10);
 }
 
-void ProcessorTab::syncTomasuloWithEditor() {
+void ProcessorTab::reloadTomasuloProgram() {
   if (!m_tomasuloWidget) {
     return;
   }
 
-  m_tomasuloWidget->loadProgramText(
-      RipesSettings::value(RIPES_SETTING_SOURCECODE).toString());
+  TomasuloSim::Config config;
+
+  config.eff_addr_buffer_entries =
+      static_cast<std::uint64_t>(m_tomasuloEffAddrBuffers->value());
+  config.fp_add_buffer_entries =
+      static_cast<std::uint64_t>(m_tomasuloFpAddBuffers->value());
+  config.fp_mul_buffer_entries =
+      static_cast<std::uint64_t>(m_tomasuloFpMulBuffers->value());
+  config.int_buffer_entries =
+      static_cast<std::uint64_t>(m_tomasuloIntBuffers->value());
+  config.reorder_buffer_entries =
+      static_cast<std::uint64_t>(m_tomasuloReorderBuffers->value());
+
+  config.fp_add_buffer_latency =
+      static_cast<std::uint64_t>(m_tomasuloFpAddLatency->value());
+  config.fp_sub_buffer_latency =
+      static_cast<std::uint64_t>(m_tomasuloFpSubLatency->value());
+  config.fp_mul_buffer_latency =
+      static_cast<std::uint64_t>(m_tomasuloFpMulLatency->value());
+  config.fp_div_buffer_latency =
+      static_cast<std::uint64_t>(m_tomasuloFpDivLatency->value());
+
+  m_tomasuloWidget->resetSimulation(
+      RipesSettings::value(RIPES_SETTING_SOURCECODE).toString(), config);
+  updateTomasuloExecutionInfo();
 }
 
+void ProcessorTab::clockTomasulo() {
+  if (!m_tomasuloWidget) {
+    return;
+  }
+
+  if (!m_tomasuloWidget->isFinished()) {
+    m_tomasuloWidget->clock();
+  }
+
+  updateTomasuloExecutionInfo();
+}
+
+void ProcessorTab::syncTomasuloWithEditor() {
+  reloadTomasuloProgram();
+}
+void ProcessorTab::updateTomasuloExecutionInfo() {
+  if (!m_tomasuloWidget) {
+    return;
+  }
+
+  const auto cycles = m_tomasuloWidget->currentCycle();
+  const auto retired = m_tomasuloWidget->instructionsRetired();
+
+  m_ui->cycleCount->setText(QString::number(static_cast<qulonglong>(cycles)));
+  m_ui->instructionsRetired->setText(
+      QString::number(static_cast<qulonglong>(retired)));
+
+  if (cycles != 0 && retired != 0) {
+    const double cpi =
+        static_cast<double>(cycles) / static_cast<double>(retired);
+    const double ipc =
+        static_cast<double>(retired) / static_cast<double>(cycles);
+
+    m_ui->cpi->setText(QString::number(cpi, 'g', 3));
+    m_ui->ipc->setText(QString::number(ipc, 'g', 3));
+  } else {
+    m_ui->cpi->setText("");
+    m_ui->ipc->setText("");
+  }
+
+  m_ui->clockRate->setText("0 Hz");
+}
 void ProcessorTab::showTomasuloView() {
   if (!m_tomasuloWidget || !m_vsrtlWidget) {
     return;
@@ -497,8 +591,13 @@ void ProcessorTab::setupSimulatorActions(QToolBar *controlToolbar) {
 
   const QIcon clockIcon = QIcon(":/icons/step.svg");
   m_clockAction = new QAction(clockIcon, "Clock (F5)", this);
-  connect(m_clockAction, &QAction::triggered, this,
-          [] { ProcessorHandler::clock(); });
+  connect(m_clockAction, &QAction::triggered, this, [this] {
+    if (m_usingTomasulo) {
+      clockTomasulo();
+    } else {
+      ProcessorHandler::clock();
+    }
+  });
   m_clockAction->setShortcut(QKeySequence("F5"));
   m_clockAction->setToolTip("Clock the circuit (F5)");
   controlToolbar->addAction(m_clockAction);
@@ -574,6 +673,11 @@ void ProcessorTab::setupSimulatorActions(QToolBar *controlToolbar) {
 }
 
 void ProcessorTab::updateStatistics() {
+  if (m_usingTomasulo) {
+    updateTomasuloExecutionInfo();
+    return;
+  }
+
   static auto lastUpdateTime = std::chrono::system_clock::now();
   static long long lastCycleCount =
       ProcessorHandler::getProcessor()->getCycleCount();
@@ -798,6 +902,14 @@ void ProcessorTab::updateInstructionLabels() {
 
 void ProcessorTab::reset() {
   m_autoClockAction->setChecked(false);
+
+  if (m_usingTomasulo) {
+    reloadTomasuloProgram();
+    enableSimulatorControls();
+    SystemIO::printString("\n");
+    return;
+  }
+
   enableSimulatorControls();
   SystemIO::printString("\n");
 }
@@ -826,8 +938,14 @@ void ProcessorTab::runFinished() {
 }
 
 void ProcessorTab::autoClockTimeout() {
+  if (m_usingTomasulo) {
+    clockTomasulo();
+    return;
+  }
+
   if (ProcessorHandler::checkBreakpoint())
     return;
+
   ProcessorHandler::clock();
 }
 
@@ -842,7 +960,11 @@ void ProcessorTab::autoClock(bool state) {
     // autoClockTimeout() which will check if the processor is at a breakpoint.
     // This is to circumvent some annoying cross-thread, eventloop,
     // race-condition-y state setting wrt. when exactly a breakpoint is hit.
-    ProcessorHandler::clock();
+    if (m_usingTomasulo) {
+      clockTomasulo();
+    } else {
+      ProcessorHandler::clock();
+    }
     m_autoClockTimer->start();
     m_autoClockAction->setIcon(stopAutoTimerIcon);
   }
@@ -862,6 +984,27 @@ void ProcessorTab::autoClock(bool state) {
 }
 
 void ProcessorTab::run(bool state) {
+  if (m_usingTomasulo) {
+    if (!state) {
+      return;
+    }
+
+    if (m_autoClockAction->isChecked()) {
+      m_autoClockAction->setChecked(false);
+    }
+
+    if (m_tomasuloWidget) {
+      m_tomasuloWidget->runToCompletion();
+      updateTomasuloExecutionInfo();
+    }
+
+    if (m_runAction->isChecked()) {
+      m_runAction->setChecked(false);
+    }
+
+    return;
+  }
+
   // Stop any currently exeuting auto-clocking
   if (m_autoClockAction->isChecked()) {
     m_autoClockAction->setChecked(false);
@@ -904,3 +1047,5 @@ void ProcessorTab::showPipelineDiagram() {
 }
 
 } // namespace Ripes
+
+

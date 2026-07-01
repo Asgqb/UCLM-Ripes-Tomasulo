@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <QAction>
 #include <QSpinBox>
@@ -79,6 +79,9 @@ private:
 
   void setupTomasuloOptionsWidget();
   void resetTomasuloOptionsToDefaults();
+  void reloadTomasuloProgram();
+  void clockTomasulo();
+  void updateTomasuloExecutionInfo();
 
   Ui::ProcessorTab *m_ui = nullptr;
   InstructionModel *m_instrModel = nullptr;
@@ -127,3 +130,5 @@ private:
 };
 
 } // namespace Ripes
+
+
