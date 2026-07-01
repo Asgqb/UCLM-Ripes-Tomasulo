@@ -4,6 +4,8 @@
 
 #include "processorregistry.h"
 
+class QCheckBox;
+
 namespace Ripes {
 
 namespace Ui {
@@ -23,6 +25,9 @@ public:
 
   ProcessorID getSelectedId() const { return m_selectedID; }
 
+  bool isTomasuloSelected() const;
+  void setTomasuloSelected(bool enabled);
+
 signals:
   void selectionChanged(ISA isa, ProcessorTags tags) const;
 
@@ -33,6 +38,7 @@ private slots:
 private:
   void populateVariants();
   void setEnabledVariants();
+  void setNormalProcessorControlsEnabled(bool enabled);
   ProcessorID redirectToValidProcessor(ISA isa, ProcessorTags tags);
 
   ISA m_selectedISA;
@@ -40,5 +46,8 @@ private:
   ProcessorTags m_selectedTags;
   Ui::ProcessorSelectionDialog *m_ui;
   std::map<ProcessorID, QStringList> m_selectedExtensionsForID;
+
+  QCheckBox *m_tomasuloCheckBox = nullptr;
 };
+
 } // namespace Ripes

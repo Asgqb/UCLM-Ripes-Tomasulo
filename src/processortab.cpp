@@ -80,31 +80,24 @@ ProcessorTab::ProcessorTab(QToolBar *controlToolbar,
   m_tomasuloWidget = new TomasuloWidget(m_ui->pipelinesplitter);
   m_tomasuloWidget->setMinimumHeight(430);
 
-  // Cargamos inicialmente en Tomasulo el texto actual del editor de Ripes.
-  // Ripes guarda el contenido del editor en RIPES_SETTING_SOURCECODE.
-  m_tomasuloWidget->loadProgramText(
-      RipesSettings::value(RIPES_SETTING_SOURCECODE).toString());
+  syncTomasuloWithEditor();
 
-  // Cada vez que cambie el texto del editor, actualizamos la tabla de
-  // instrucciones de Tomasulo.
   connect(RipesSettings::getObserver(RIPES_SETTING_SOURCECODE),
           &SettingObserver::modified, this, [this](const auto &) {
             if (m_tomasuloWidget) {
-              m_tomasuloWidget->loadProgramText(
-                  RipesSettings::value(RIPES_SETTING_SOURCECODE).toString());
+              syncTomasuloWithEditor();
             }
           });
 
   bool inserted = false;
 
-  // Insertamos Tomasulo en el splitter, pero NO destruimos ni reemplazamos
-  // definitivamente el VSRTLWidget. Ripes lo sigue usando internamente para
-  // cargar procesadores, sincronizar, resetear, etc.
+  // Insertamos Tomasulo en el splitter, pero NO destruimos el VSRTLWidget.
+  // Ripes sigue usando VSRTLWidget internamente para cargar procesadores,
+  // sincronizar, resetear, etc.
   const int vsrtlIndex = m_ui->pipelinesplitter->indexOf(m_ui->vsrtlWidget);
 
   if (vsrtlIndex >= 0) {
     m_ui->pipelinesplitter->insertWidget(vsrtlIndex, m_tomasuloWidget);
-    m_ui->vsrtlWidget->hide();
     inserted = true;
   }
 
@@ -181,15 +174,11 @@ ProcessorTab::ProcessorTab(QToolBar *controlToolbar,
   connect(ProcessorHandler::get(), &ProcessorHandler::stopping, this,
           &ProcessorTab::pause);
 
-  // Make Tomasulo view take more vertical space than the console.
-  // Tras insertar Tomasulo, el splitter queda así:
-  //   0 -> TomasuloWidget
-  //   1 -> vsrtlWidget oculto
-  //   2 -> zona inferior: consola/memoria
-  m_ui->pipelinesplitter->setStretchFactor(0, 5);
-  m_ui->pipelinesplitter->setStretchFactor(1, 0);
-  m_ui->pipelinesplitter->setStretchFactor(2, 2);
-  m_ui->pipelinesplitter->setSizes(QList<int>{520, 0, 220});
+  if (m_usingTomasulo) {
+    showTomasuloView();
+  } else {
+    showVSRTLView();
+  }
 
   // Make processor view stretch wrt. right side tabs
   m_ui->viewSplitter->setStretchFactor(0, 1);
@@ -201,6 +190,55 @@ ProcessorTab::ProcessorTab(QToolBar *controlToolbar,
 
   // Initially, no file is loaded, disable toolbuttons
   enableSimulatorControls();
+}
+
+void ProcessorTab::syncTomasuloWithEditor() {
+  if (!m_tomasuloWidget) {
+    return;
+  }
+
+  m_tomasuloWidget->loadProgramText(
+      RipesSettings::value(RIPES_SETTING_SOURCECODE).toString());
+}
+
+void ProcessorTab::showTomasuloView() {
+  if (!m_tomasuloWidget || !m_vsrtlWidget) {
+    return;
+  }
+
+  syncTomasuloWithEditor();
+
+  m_tomasuloWidget->show();
+  m_vsrtlWidget->hide();
+
+  // Tras insertar Tomasulo, el splitter queda asi:
+  //   0 -> TomasuloWidget
+  //   1 -> vsrtlWidget oculto
+  //   2 -> zona inferior: consola/memoria
+  m_ui->pipelinesplitter->setStretchFactor(0, 5);
+  m_ui->pipelinesplitter->setStretchFactor(1, 0);
+  m_ui->pipelinesplitter->setStretchFactor(2, 2);
+  m_ui->pipelinesplitter->setSizes(QList<int>{520, 0, 220});
+}
+
+void ProcessorTab::showVSRTLView() {
+  if (!m_tomasuloWidget || !m_vsrtlWidget) {
+    return;
+  }
+
+  m_tomasuloWidget->hide();
+  m_vsrtlWidget->show();
+
+  // Modo normal de Ripes:
+  //   0 -> TomasuloWidget oculto
+  //   1 -> vsrtlWidget
+  //   2 -> zona inferior: consola/memoria
+  m_ui->pipelinesplitter->setStretchFactor(0, 0);
+  m_ui->pipelinesplitter->setStretchFactor(1, 5);
+  m_ui->pipelinesplitter->setStretchFactor(2, 2);
+  m_ui->pipelinesplitter->setSizes(QList<int>{0, 520, 220});
+
+  fitToScreen();
 }
 
 void ProcessorTab::loadLayout(const Layout &layout) {
@@ -424,8 +462,21 @@ void ProcessorTab::loadProcessorToWidget(const Layout *layout) {
 
 void ProcessorTab::processorSelection() {
   m_autoClockAction->setChecked(false);
+
   ProcessorSelectionDialog diag;
+  diag.setTomasuloSelected(m_usingTomasulo);
+
   if (diag.exec()) {
+    if (diag.isTomasuloSelected()) {
+      m_usingTomasulo = true;
+      showTomasuloView();
+      enableSimulatorControls();
+      return;
+    }
+
+    m_usingTomasulo = false;
+    showVSRTLView();
+
     // New processor model was selected
     m_vsrtlWidget->clearDesign();
     m_stageInstructionLabels.clear();
@@ -453,6 +504,8 @@ void ProcessorTab::processorSelection() {
     if (m_displayValuesAction->isChecked()) {
       m_vsrtlWidget->setOutputPortValuesVisible(true);
     }
+
+    enableSimulatorControls();
   }
 }
 

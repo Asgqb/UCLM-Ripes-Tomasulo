@@ -3,6 +3,7 @@
 
 #include <QCheckBox>
 #include <QDialogButtonBox>
+#include <QPushButton>
 #include <QTimer>
 
 #include "processorhandler.h"
@@ -16,6 +17,29 @@ ProcessorSelectionDialog::ProcessorSelectionDialog(QWidget *parent)
 
   m_ui->setupUi(this);
   setWindowTitle("Configure Processor");
+
+  m_tomasuloCheckBox = new QCheckBox("Use Tomasulo", this);
+  m_tomasuloCheckBox->setToolTip(
+      "Shows the Tomasulo interface instead of the normal Ripes VSRTL "
+      "processor view.");
+  m_ui->verticalLayout_2->insertWidget(0, m_tomasuloCheckBox);
+
+  connect(m_tomasuloCheckBox, &QCheckBox::toggled, this,
+          [this](bool checked) {
+            if (checked) {
+              setNormalProcessorControlsEnabled(false);
+              m_ui->description->setEnabled(true);
+              m_ui->description->setText(
+                  "Tomasulo selected.\n\n"
+                  "When accepted, the Tomasulo graphical interface will be "
+                  "shown. The program will still be read from the Ripes "
+                  "editor.");
+              m_ui->buttonBox->button(QDialogButtonBox::Ok)->setEnabled(true);
+            } else {
+              setNormalProcessorControlsEnabled(true);
+              updateDialog(m_selectedISA, m_selectedTags);
+            }
+          });
 
   // Set properties for current processor
   m_selectedID = qvariant_cast<ProcessorID>(
@@ -81,16 +105,19 @@ ProcessorSelectionDialog::ProcessorSelectionDialog(QWidget *parent)
   m_ui->xlen->setCurrentIndex(m_ui->xlen->findData(desc.isaInfo().isa->bits()));
   m_ui->isa->setCurrentIndex(m_ui->isa->findData(
       (int)desc.isaInfo().isa->isaID() - m_ui->xlen->currentIndex()));
+
   // Datapath
   m_ui->datapath->setCurrentIndex(
       m_ui->datapath->findData(desc.tags.datapathType));
   m_ui->hasForwarding->setChecked(desc.tags.hasForwarding);
   m_ui->hasHazardDetection->setChecked(desc.tags.hasHazardDetection);
+
   // Branches
   m_ui->branchStrategy->setCurrentIndex(
       m_ui->branchStrategy->findData(desc.tags.branchStrategy));
   m_ui->branchSlots->setCurrentIndex(
       m_ui->branchSlots->findData(desc.tags.branchDelaySlots));
+
   // Description
   m_ui->description->setText(desc.description);
 
@@ -103,6 +130,7 @@ ProcessorSelectionDialog::ProcessorSelectionDialog(QWidget *parent)
     if (m_selectedExtensionsForID[desc.id].contains(ext)) {
       chkbox->setChecked(true);
     }
+
     // Connect checkbox toggle events
     connect(chkbox, &QCheckBox::toggled, this, [this, ext](bool toggled) {
       if (toggled) {
@@ -141,6 +169,16 @@ ProcessorSelectionDialog::ProcessorSelectionDialog(QWidget *parent)
 
 ProcessorSelectionDialog::~ProcessorSelectionDialog() { delete m_ui; }
 
+bool ProcessorSelectionDialog::isTomasuloSelected() const {
+  return m_tomasuloCheckBox && m_tomasuloCheckBox->isChecked();
+}
+
+void ProcessorSelectionDialog::setTomasuloSelected(bool enabled) {
+  if (m_tomasuloCheckBox) {
+    m_tomasuloCheckBox->setChecked(enabled);
+  }
+}
+
 QStringList ProcessorSelectionDialog::getEnabledExtensions() const {
   return m_selectedExtensionsForID.at(m_selectedID);
 }
@@ -161,7 +199,30 @@ const Layout *ProcessorSelectionDialog::getSelectedLayout() const {
   return nullptr;
 }
 
+void ProcessorSelectionDialog::setNormalProcessorControlsEnabled(bool enabled) {
+  m_ui->isa->setEnabled(enabled);
+  m_ui->xlen->setEnabled(enabled);
+  m_ui->datapath->setEnabled(enabled);
+
+  m_ui->hasForwarding->setEnabled(enabled);
+  m_ui->hasHazardDetection->setEnabled(enabled);
+  m_ui->branchStrategy->setEnabled(enabled);
+  m_ui->branchSlots->setEnabled(enabled);
+
+  m_ui->regInitWidget->setEnabled(enabled);
+  m_ui->layout->setEnabled(enabled);
+  m_ui->layoutLabel->setEnabled(enabled);
+
+  if (enabled) {
+    setEnabledVariants();
+  }
+}
+
 void ProcessorSelectionDialog::updateSelectedTags() {
+  if (isTomasuloSelected()) {
+    return;
+  }
+
   ISA selectedISA = // hacky hack
       (ISA)(m_ui->isa->currentData().toInt() + m_ui->xlen->currentIndex());
   DatapathType selectedDatapath =
@@ -195,6 +256,10 @@ void ProcessorSelectionDialog::updateSelectedTags() {
 }
 
 void ProcessorSelectionDialog::updateDialog(ISA isa, ProcessorTags tags) {
+  if (isTomasuloSelected()) {
+    return;
+  }
+
   QList<ProcessorID> selected = ProcessorRegistry::getProcessor(isa, tags);
 
   // Check valid selection and update selected processor
@@ -295,11 +360,16 @@ void ProcessorSelectionDialog::populateVariants() {
       }
     }
   }
+
   // Sort branch delay slot options in ascending order
   m_ui->branchSlots->model()->sort(0);
 }
 
 void ProcessorSelectionDialog::setEnabledVariants() {
+  if (isTomasuloSelected()) {
+    return;
+  }
+
   const auto &desc = ProcessorRegistry::getDescription(m_selectedID);
   bool forwarding = desc.tags.hasForwarding;
   bool hazard = desc.tags.hasHazardDetection;

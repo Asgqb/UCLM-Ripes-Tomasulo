@@ -39,6 +39,9 @@ public:
 
   void initRegWidget();
 
+signals:
+  void cacheConfigurationChanged();
+
 public slots:
   void pause();
   void restart();
@@ -59,10 +62,6 @@ private slots:
   void autoClockTimeout();
   void setInstructionViewCenterRow(int row);
   void showPipelineDiagram();
-  
-  // Añado esto para ver si puedo conseguir recargar pestañas desde aquí cuando se cambie la config
- signals: 
-  void cacheConfigurationChanged();
 
 private:
   void setupSimulatorActions(QToolBar *controlToolbar);
@@ -71,6 +70,10 @@ private:
   void updateRegisterModel();
   void loadLayout(const Layout &);
   void loadProcessorToWidget(const Layout *);
+
+  void syncTomasuloWithEditor();
+  void showTomasuloView();
+  void showVSRTLView();
 
   Ui::ProcessorTab *m_ui = nullptr;
   InstructionModel *m_instrModel = nullptr;
@@ -81,11 +84,11 @@ private:
 
   std::map<StageIndex, vsrtl::Label *> m_stageInstructionLabels;
 
-  QTimer *m_statUpdateTimer;
+  QTimer *m_statUpdateTimer = nullptr;
 
   // Actions
   QAction *m_selectProcessorAction = nullptr;
-  QAction* m_selectCacheAction = nullptr;
+  QAction *m_selectCacheAction = nullptr;
 
   QAction *m_clockAction = nullptr;
   QAction *m_autoClockAction = nullptr;
@@ -98,5 +101,8 @@ private:
   QTimer *m_autoClockTimer = nullptr;
 
   QSpinBox *m_autoClockInterval = nullptr;
+
+  bool m_usingTomasulo = true;
 };
+
 } // namespace Ripes
