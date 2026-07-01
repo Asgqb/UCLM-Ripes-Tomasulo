@@ -84,10 +84,8 @@ static QSpinBox *createTomasuloSpinBox(QWidget *parent, int minimum,
   spinBox->setRange(minimum, maximum);
   spinBox->setAlignment(Qt::AlignRight);
 
-  // Ancho suficiente para mostrar textos como "2 cycles", "10 cycles"
-  // y "40 cycles" sin que Qt los recorte con "...".
-  spinBox->setMinimumWidth(118);
-  spinBox->setMaximumWidth(140);
+  spinBox->setMinimumWidth(92);
+  spinBox->setMaximumWidth(128);
   spinBox->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
 
   if (!suffix.isEmpty()) {
@@ -241,10 +239,8 @@ void ProcessorTab::setupTomasuloOptionsWidget() {
       "Default Tomasulo configuration. These values can be modified and will "
       "be used by the Tomasulo simulator integration.");
 
-  // Aumentado para que los selectores de latencias no recorten "cycles".
   m_tomasuloOptionsGroup->setMinimumWidth(430);
   m_tomasuloOptionsGroup->setMaximumWidth(560);
-
   m_tomasuloOptionsGroup->setSizePolicy(QSizePolicy::Preferred,
                                         QSizePolicy::MinimumExpanding);
 
@@ -255,22 +251,22 @@ void ProcessorTab::setupTomasuloOptionsWidget() {
   auto *columnsLayout = new QHBoxLayout();
   columnsLayout->setSpacing(12);
 
-  auto *stationsColumn = new QVBoxLayout();
-  stationsColumn->setSpacing(4);
+  auto *buffersColumn = new QVBoxLayout();
+  buffersColumn->setSpacing(4);
 
   auto *latenciesColumn = new QVBoxLayout();
   latenciesColumn->setSpacing(4);
 
-  auto *stationsTitle =
-      createTomasuloSectionLabel("Stations / buffers", m_tomasuloOptionsGroup);
+  auto *buffersTitle =
+      createTomasuloSectionLabel("Buffers", m_tomasuloOptionsGroup);
   auto *latenciesTitle =
       createTomasuloSectionLabel("Latencies", m_tomasuloOptionsGroup);
 
-  auto *stationsForm = new QFormLayout();
-  stationsForm->setContentsMargins(0, 0, 0, 0);
-  stationsForm->setSpacing(4);
-  stationsForm->setLabelAlignment(Qt::AlignRight | Qt::AlignVCenter);
-  stationsForm->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
+  auto *buffersForm = new QFormLayout();
+  buffersForm->setContentsMargins(0, 0, 0, 0);
+  buffersForm->setSpacing(4);
+  buffersForm->setLabelAlignment(Qt::AlignRight | Qt::AlignVCenter);
+  buffersForm->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
 
   auto *latenciesForm = new QFormLayout();
   latenciesForm->setContentsMargins(0, 0, 0, 0);
@@ -278,49 +274,46 @@ void ProcessorTab::setupTomasuloOptionsWidget() {
   latenciesForm->setLabelAlignment(Qt::AlignRight | Qt::AlignVCenter);
   latenciesForm->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
 
-  m_tomasuloAddSubStations =
-      createTomasuloSpinBox(m_tomasuloOptionsGroup, 1, 32);
-  m_tomasuloMultStations =
-      createTomasuloSpinBox(m_tomasuloOptionsGroup, 1, 32);
-  m_tomasuloDivStations =
-      createTomasuloSpinBox(m_tomasuloOptionsGroup, 1, 32);
-  m_tomasuloLoadBuffers =
-      createTomasuloSpinBox(m_tomasuloOptionsGroup, 1, 32);
-  m_tomasuloStoreBuffers =
-      createTomasuloSpinBox(m_tomasuloOptionsGroup, 1, 32);
+  m_tomasuloEffAddrBuffers =
+      createTomasuloSpinBox(m_tomasuloOptionsGroup, 1, 64);
+  m_tomasuloFpAddBuffers =
+      createTomasuloSpinBox(m_tomasuloOptionsGroup, 1, 64);
+  m_tomasuloFpMulBuffers =
+      createTomasuloSpinBox(m_tomasuloOptionsGroup, 1, 64);
+  m_tomasuloIntBuffers =
+      createTomasuloSpinBox(m_tomasuloOptionsGroup, 1, 64);
+  m_tomasuloReorderBuffers =
+      createTomasuloSpinBox(m_tomasuloOptionsGroup, 1, 256);
 
-  m_tomasuloAddSubLatency =
+  m_tomasuloFpAddLatency =
       createTomasuloSpinBox(m_tomasuloOptionsGroup, 1, 999, " cycles");
-  m_tomasuloMultLatency =
+  m_tomasuloFpSubLatency =
       createTomasuloSpinBox(m_tomasuloOptionsGroup, 1, 999, " cycles");
-  m_tomasuloDivLatency =
+  m_tomasuloFpMulLatency =
       createTomasuloSpinBox(m_tomasuloOptionsGroup, 1, 999, " cycles");
-  m_tomasuloLoadLatency =
-      createTomasuloSpinBox(m_tomasuloOptionsGroup, 1, 999, " cycles");
-  m_tomasuloStoreLatency =
+  m_tomasuloFpDivLatency =
       createTomasuloSpinBox(m_tomasuloOptionsGroup, 1, 999, " cycles");
 
-  stationsForm->addRow("Add/Sub:", m_tomasuloAddSubStations);
-  stationsForm->addRow("Mult:", m_tomasuloMultStations);
-  stationsForm->addRow("Div:", m_tomasuloDivStations);
-  stationsForm->addRow("Load:", m_tomasuloLoadBuffers);
-  stationsForm->addRow("Store:", m_tomasuloStoreBuffers);
+  buffersForm->addRow("Eff addr:", m_tomasuloEffAddrBuffers);
+  buffersForm->addRow("FP adds:", m_tomasuloFpAddBuffers);
+  buffersForm->addRow("FP muls:", m_tomasuloFpMulBuffers);
+  buffersForm->addRow("Ints:", m_tomasuloIntBuffers);
+  buffersForm->addRow("Reorder:", m_tomasuloReorderBuffers);
 
-  latenciesForm->addRow("Add/Sub:", m_tomasuloAddSubLatency);
-  latenciesForm->addRow("Mult:", m_tomasuloMultLatency);
-  latenciesForm->addRow("Div:", m_tomasuloDivLatency);
-  latenciesForm->addRow("Load:", m_tomasuloLoadLatency);
-  latenciesForm->addRow("Store:", m_tomasuloStoreLatency);
+  latenciesForm->addRow("FP add:", m_tomasuloFpAddLatency);
+  latenciesForm->addRow("FP sub:", m_tomasuloFpSubLatency);
+  latenciesForm->addRow("FP mul:", m_tomasuloFpMulLatency);
+  latenciesForm->addRow("FP div:", m_tomasuloFpDivLatency);
 
-  stationsColumn->addWidget(stationsTitle);
-  stationsColumn->addLayout(stationsForm);
-  stationsColumn->addStretch();
+  buffersColumn->addWidget(buffersTitle);
+  buffersColumn->addLayout(buffersForm);
+  buffersColumn->addStretch();
 
   latenciesColumn->addWidget(latenciesTitle);
   latenciesColumn->addLayout(latenciesForm);
   latenciesColumn->addStretch();
 
-  columnsLayout->addLayout(stationsColumn);
+  columnsLayout->addLayout(buffersColumn);
   columnsLayout->addLayout(latenciesColumn);
 
   auto *buttonLayout = new QHBoxLayout();
@@ -353,27 +346,26 @@ void ProcessorTab::setupTomasuloOptionsWidget() {
 }
 
 void ProcessorTab::resetTomasuloOptionsToDefaults() {
-  if (!m_tomasuloAddSubStations || !m_tomasuloMultStations ||
-      !m_tomasuloDivStations || !m_tomasuloLoadBuffers ||
-      !m_tomasuloStoreBuffers || !m_tomasuloAddSubLatency ||
-      !m_tomasuloMultLatency || !m_tomasuloDivLatency ||
-      !m_tomasuloLoadLatency || !m_tomasuloStoreLatency) {
+  if (!m_tomasuloEffAddrBuffers || !m_tomasuloFpAddBuffers ||
+      !m_tomasuloFpMulBuffers || !m_tomasuloIntBuffers ||
+      !m_tomasuloReorderBuffers || !m_tomasuloFpAddLatency ||
+      !m_tomasuloFpSubLatency || !m_tomasuloFpMulLatency ||
+      !m_tomasuloFpDivLatency) {
     return;
   }
 
-  // Default reservation stations / buffers
-  m_tomasuloAddSubStations->setValue(3);
-  m_tomasuloMultStations->setValue(2);
-  m_tomasuloDivStations->setValue(1);
-  m_tomasuloLoadBuffers->setValue(3);
-  m_tomasuloStoreBuffers->setValue(3);
+  // Default buffers from the translated Tomasulo simulator configuration.
+  m_tomasuloEffAddrBuffers->setValue(2);
+  m_tomasuloFpAddBuffers->setValue(3);
+  m_tomasuloFpMulBuffers->setValue(3);
+  m_tomasuloIntBuffers->setValue(2);
+  m_tomasuloReorderBuffers->setValue(5);
 
-  // Default operation latencies
-  m_tomasuloAddSubLatency->setValue(2);
-  m_tomasuloMultLatency->setValue(10);
-  m_tomasuloDivLatency->setValue(40);
-  m_tomasuloLoadLatency->setValue(2);
-  m_tomasuloStoreLatency->setValue(2);
+  // Default latencies from the translated Tomasulo simulator configuration.
+  m_tomasuloFpAddLatency->setValue(2);
+  m_tomasuloFpSubLatency->setValue(2);
+  m_tomasuloFpMulLatency->setValue(5);
+  m_tomasuloFpDivLatency->setValue(10);
 }
 
 void ProcessorTab::syncTomasuloWithEditor() {

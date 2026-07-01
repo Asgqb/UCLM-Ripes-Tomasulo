@@ -94,17 +94,18 @@ private:
   // Tomasulo options panel
   QGroupBox *m_tomasuloOptionsGroup = nullptr;
 
-  QSpinBox *m_tomasuloAddSubStations = nullptr;
-  QSpinBox *m_tomasuloMultStations = nullptr;
-  QSpinBox *m_tomasuloDivStations = nullptr;
-  QSpinBox *m_tomasuloLoadBuffers = nullptr;
-  QSpinBox *m_tomasuloStoreBuffers = nullptr;
+  // Buffers
+  QSpinBox *m_tomasuloEffAddrBuffers = nullptr;
+  QSpinBox *m_tomasuloFpAddBuffers = nullptr;
+  QSpinBox *m_tomasuloFpMulBuffers = nullptr;
+  QSpinBox *m_tomasuloIntBuffers = nullptr;
+  QSpinBox *m_tomasuloReorderBuffers = nullptr;
 
-  QSpinBox *m_tomasuloAddSubLatency = nullptr;
-  QSpinBox *m_tomasuloMultLatency = nullptr;
-  QSpinBox *m_tomasuloDivLatency = nullptr;
-  QSpinBox *m_tomasuloLoadLatency = nullptr;
-  QSpinBox *m_tomasuloStoreLatency = nullptr;
+  // Latencies
+  QSpinBox *m_tomasuloFpAddLatency = nullptr;
+  QSpinBox *m_tomasuloFpSubLatency = nullptr;
+  QSpinBox *m_tomasuloFpMulLatency = nullptr;
+  QSpinBox *m_tomasuloFpDivLatency = nullptr;
 
   // Actions
   QAction *m_selectProcessorAction = nullptr;
