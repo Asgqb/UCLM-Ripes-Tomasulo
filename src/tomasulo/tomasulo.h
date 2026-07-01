@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QString>
 #include <QWidget>
 
 class QTableWidget;
@@ -10,6 +11,8 @@ class TomasuloWidget : public QWidget {
 public:
   explicit TomasuloWidget(QWidget *parent = nullptr);
 
+  void loadProgramText(const QString &programText);
+
 private:
   void setupUi();
   void setupInstructionTable();
@@ -18,8 +21,6 @@ private:
 
   void configureTable(QTableWidget *table, int rowHeight = 22);
   void configureCompactRegisterTable(QTableWidget *table);
-
-  void fillDummyData();
 
   QTableWidget *m_instructionTable = nullptr;
   QTableWidget *m_reservationTable = nullptr;

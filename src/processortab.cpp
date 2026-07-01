@@ -77,50 +77,39 @@ ProcessorTab::ProcessorTab(QToolBar *controlToolbar,
 
   m_vsrtlWidget = m_ui->vsrtlWidget;
 
-  m_tomasuloWidget = new TomasuloWidget;
+  m_tomasuloWidget = new TomasuloWidget(m_ui->pipelinesplitter);
   m_tomasuloWidget->setMinimumHeight(430);
 
-  bool replaced = false;
+  // Cargamos inicialmente en Tomasulo el texto actual del editor de Ripes.
+  // Ripes guarda el contenido del editor en RIPES_SETTING_SOURCECODE.
+  m_tomasuloWidget->loadProgramText(
+      RipesSettings::value(RIPES_SETTING_SOURCECODE).toString());
 
-  // Intento principal: reemplazar el VSRTLWidget directamente dentro del
-  // splitter vertical que separa la vista del procesador de la consola.
+  // Cada vez que cambie el texto del editor, actualizamos la tabla de
+  // instrucciones de Tomasulo.
+  connect(RipesSettings::getObserver(RIPES_SETTING_SOURCECODE),
+          &SettingObserver::modified, this, [this](const auto &) {
+            if (m_tomasuloWidget) {
+              m_tomasuloWidget->loadProgramText(
+                  RipesSettings::value(RIPES_SETTING_SOURCECODE).toString());
+            }
+          });
+
+  bool inserted = false;
+
+  // Insertamos Tomasulo en el splitter, pero NO destruimos ni reemplazamos
+  // definitivamente el VSRTLWidget. Ripes lo sigue usando internamente para
+  // cargar procesadores, sincronizar, resetear, etc.
   const int vsrtlIndex = m_ui->pipelinesplitter->indexOf(m_ui->vsrtlWidget);
 
   if (vsrtlIndex >= 0) {
-    QWidget *oldWidget =
-        m_ui->pipelinesplitter->replaceWidget(vsrtlIndex, m_tomasuloWidget);
-
-    if (oldWidget) {
-      oldWidget->hide();
-
-      // No borramos el VSRTLWidget porque Ripes todavía lo usa internamente
-      // para cargar el procesador, sincronizar, resetear, etc.
-      oldWidget->setParent(this);
-    }
-
-    replaced = true;
+    m_ui->pipelinesplitter->insertWidget(vsrtlIndex, m_tomasuloWidget);
+    m_ui->vsrtlWidget->hide();
+    inserted = true;
   }
 
-  // Fallback: por si el widget no estuviera directamente en pipelinesplitter.
-  if (!replaced) {
-    auto *vsrtlParent = m_ui->vsrtlWidget->parentWidget();
-
-    if (vsrtlParent && vsrtlParent->layout()) {
-      auto *oldItem =
-          vsrtlParent->layout()->replaceWidget(m_ui->vsrtlWidget,
-                                               m_tomasuloWidget,
-                                               Qt::FindChildrenRecursively);
-
-      if (oldItem) {
-        delete oldItem;
-        m_ui->vsrtlWidget->hide();
-        replaced = true;
-      }
-    }
-  }
-
-  if (!replaced) {
-    qDebug() << "No se ha podido reemplazar vsrtlWidget por TomasuloWidget";
+  if (!inserted) {
+    qDebug() << "No se ha podido insertar TomasuloWidget en pipelinesplitter";
   }
 
   if (ProcessorHandler::isVSRTLProcessor()) {
@@ -193,9 +182,14 @@ ProcessorTab::ProcessorTab(QToolBar *controlToolbar,
           &ProcessorTab::pause);
 
   // Make Tomasulo view take more vertical space than the console.
-  m_ui->pipelinesplitter->setStretchFactor(0, 3);
-  m_ui->pipelinesplitter->setStretchFactor(1, 2);
-  m_ui->pipelinesplitter->setSizes(QList<int>{460, 260});
+  // Tras insertar Tomasulo, el splitter queda así:
+  //   0 -> TomasuloWidget
+  //   1 -> vsrtlWidget oculto
+  //   2 -> zona inferior: consola/memoria
+  m_ui->pipelinesplitter->setStretchFactor(0, 5);
+  m_ui->pipelinesplitter->setStretchFactor(1, 0);
+  m_ui->pipelinesplitter->setStretchFactor(2, 2);
+  m_ui->pipelinesplitter->setSizes(QList<int>{520, 0, 220});
 
   // Make processor view stretch wrt. right side tabs
   m_ui->viewSplitter->setStretchFactor(0, 1);
