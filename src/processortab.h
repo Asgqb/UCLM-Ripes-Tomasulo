@@ -10,6 +10,8 @@
 #include "processors/interface/ripesprocessor.h"
 #include "ripestab.h"
 
+class QGroupBox;
+
 namespace vsrtl {
 class VSRTLWidget;
 class Label;
@@ -75,6 +77,9 @@ private:
   void showTomasuloView();
   void showVSRTLView();
 
+  void setupTomasuloOptionsWidget();
+  void resetTomasuloOptionsToDefaults();
+
   Ui::ProcessorTab *m_ui = nullptr;
   InstructionModel *m_instrModel = nullptr;
   PipelineDiagramModel *m_stageModel = nullptr;
@@ -85,6 +90,21 @@ private:
   std::map<StageIndex, vsrtl::Label *> m_stageInstructionLabels;
 
   QTimer *m_statUpdateTimer = nullptr;
+
+  // Tomasulo options panel
+  QGroupBox *m_tomasuloOptionsGroup = nullptr;
+
+  QSpinBox *m_tomasuloAddSubStations = nullptr;
+  QSpinBox *m_tomasuloMultStations = nullptr;
+  QSpinBox *m_tomasuloDivStations = nullptr;
+  QSpinBox *m_tomasuloLoadBuffers = nullptr;
+  QSpinBox *m_tomasuloStoreBuffers = nullptr;
+
+  QSpinBox *m_tomasuloAddSubLatency = nullptr;
+  QSpinBox *m_tomasuloMultLatency = nullptr;
+  QSpinBox *m_tomasuloDivLatency = nullptr;
+  QSpinBox *m_tomasuloLoadLatency = nullptr;
+  QSpinBox *m_tomasuloStoreLatency = nullptr;
 
   // Actions
   QAction *m_selectProcessorAction = nullptr;

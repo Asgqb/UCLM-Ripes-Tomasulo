@@ -4,13 +4,19 @@
 #include <QDebug>
 #include <QDir>
 #include <QFontMetrics>
+#include <QFormLayout>
+#include <QGroupBox>
+#include <QHBoxLayout>
+#include <QLabel>
 #include <QLayout>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QScrollBar>
+#include <QSizePolicy>
 #include <QSpinBox>
 #include <QSplitter>
 #include <QTemporaryFile>
+#include <QVBoxLayout>
 
 #include "cacheselectiondialog.h"
 #include "cachesim/cachetypes.h"
@@ -70,12 +76,44 @@ static QString convertToSIUnits(const double l_value, int precision = 2) {
   return QString::number(0) + " ";
 }
 
+static QSpinBox *createTomasuloSpinBox(QWidget *parent, int minimum,
+                                       int maximum,
+                                       const QString &suffix = QString()) {
+  auto *spinBox = new QSpinBox(parent);
+
+  spinBox->setRange(minimum, maximum);
+  spinBox->setAlignment(Qt::AlignRight);
+
+  // Ancho suficiente para mostrar textos como "2 cycles", "10 cycles"
+  // y "40 cycles" sin que Qt los recorte con "...".
+  spinBox->setMinimumWidth(118);
+  spinBox->setMaximumWidth(140);
+  spinBox->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+
+  if (!suffix.isEmpty()) {
+    spinBox->setSuffix(suffix);
+  }
+
+  return spinBox;
+}
+
+static QLabel *createTomasuloSectionLabel(const QString &text,
+                                          QWidget *parent) {
+  auto *label = new QLabel(text, parent);
+  QFont font = label->font();
+  font.setBold(true);
+  label->setFont(font);
+  return label;
+}
+
 ProcessorTab::ProcessorTab(QToolBar *controlToolbar,
                            QToolBar *additionalToolbar, QWidget *parent)
     : RipesTab(additionalToolbar, parent), m_ui(new Ui::ProcessorTab) {
   m_ui->setupUi(this);
 
   m_vsrtlWidget = m_ui->vsrtlWidget;
+
+  setupTomasuloOptionsWidget();
 
   m_tomasuloWidget = new TomasuloWidget(m_ui->pipelinesplitter);
   m_tomasuloWidget->setMinimumHeight(430);
@@ -192,6 +230,152 @@ ProcessorTab::ProcessorTab(QToolBar *controlToolbar,
   enableSimulatorControls();
 }
 
+void ProcessorTab::setupTomasuloOptionsWidget() {
+  if (m_tomasuloOptionsGroup) {
+    return;
+  }
+
+  m_tomasuloOptionsGroup =
+      new QGroupBox("Tomasulo options", m_ui->horizontalLayoutWidget_2);
+  m_tomasuloOptionsGroup->setToolTip(
+      "Default Tomasulo configuration. These values can be modified and will "
+      "be used by the Tomasulo simulator integration.");
+
+  // Aumentado para que los selectores de latencias no recorten "cycles".
+  m_tomasuloOptionsGroup->setMinimumWidth(430);
+  m_tomasuloOptionsGroup->setMaximumWidth(560);
+
+  m_tomasuloOptionsGroup->setSizePolicy(QSizePolicy::Preferred,
+                                        QSizePolicy::MinimumExpanding);
+
+  auto *mainLayout = new QVBoxLayout(m_tomasuloOptionsGroup);
+  mainLayout->setContentsMargins(8, 6, 8, 6);
+  mainLayout->setSpacing(4);
+
+  auto *columnsLayout = new QHBoxLayout();
+  columnsLayout->setSpacing(12);
+
+  auto *stationsColumn = new QVBoxLayout();
+  stationsColumn->setSpacing(4);
+
+  auto *latenciesColumn = new QVBoxLayout();
+  latenciesColumn->setSpacing(4);
+
+  auto *stationsTitle =
+      createTomasuloSectionLabel("Stations / buffers", m_tomasuloOptionsGroup);
+  auto *latenciesTitle =
+      createTomasuloSectionLabel("Latencies", m_tomasuloOptionsGroup);
+
+  auto *stationsForm = new QFormLayout();
+  stationsForm->setContentsMargins(0, 0, 0, 0);
+  stationsForm->setSpacing(4);
+  stationsForm->setLabelAlignment(Qt::AlignRight | Qt::AlignVCenter);
+  stationsForm->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
+
+  auto *latenciesForm = new QFormLayout();
+  latenciesForm->setContentsMargins(0, 0, 0, 0);
+  latenciesForm->setSpacing(4);
+  latenciesForm->setLabelAlignment(Qt::AlignRight | Qt::AlignVCenter);
+  latenciesForm->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
+
+  m_tomasuloAddSubStations =
+      createTomasuloSpinBox(m_tomasuloOptionsGroup, 1, 32);
+  m_tomasuloMultStations =
+      createTomasuloSpinBox(m_tomasuloOptionsGroup, 1, 32);
+  m_tomasuloDivStations =
+      createTomasuloSpinBox(m_tomasuloOptionsGroup, 1, 32);
+  m_tomasuloLoadBuffers =
+      createTomasuloSpinBox(m_tomasuloOptionsGroup, 1, 32);
+  m_tomasuloStoreBuffers =
+      createTomasuloSpinBox(m_tomasuloOptionsGroup, 1, 32);
+
+  m_tomasuloAddSubLatency =
+      createTomasuloSpinBox(m_tomasuloOptionsGroup, 1, 999, " cycles");
+  m_tomasuloMultLatency =
+      createTomasuloSpinBox(m_tomasuloOptionsGroup, 1, 999, " cycles");
+  m_tomasuloDivLatency =
+      createTomasuloSpinBox(m_tomasuloOptionsGroup, 1, 999, " cycles");
+  m_tomasuloLoadLatency =
+      createTomasuloSpinBox(m_tomasuloOptionsGroup, 1, 999, " cycles");
+  m_tomasuloStoreLatency =
+      createTomasuloSpinBox(m_tomasuloOptionsGroup, 1, 999, " cycles");
+
+  stationsForm->addRow("Add/Sub:", m_tomasuloAddSubStations);
+  stationsForm->addRow("Mult:", m_tomasuloMultStations);
+  stationsForm->addRow("Div:", m_tomasuloDivStations);
+  stationsForm->addRow("Load:", m_tomasuloLoadBuffers);
+  stationsForm->addRow("Store:", m_tomasuloStoreBuffers);
+
+  latenciesForm->addRow("Add/Sub:", m_tomasuloAddSubLatency);
+  latenciesForm->addRow("Mult:", m_tomasuloMultLatency);
+  latenciesForm->addRow("Div:", m_tomasuloDivLatency);
+  latenciesForm->addRow("Load:", m_tomasuloLoadLatency);
+  latenciesForm->addRow("Store:", m_tomasuloStoreLatency);
+
+  stationsColumn->addWidget(stationsTitle);
+  stationsColumn->addLayout(stationsForm);
+  stationsColumn->addStretch();
+
+  latenciesColumn->addWidget(latenciesTitle);
+  latenciesColumn->addLayout(latenciesForm);
+  latenciesColumn->addStretch();
+
+  columnsLayout->addLayout(stationsColumn);
+  columnsLayout->addLayout(latenciesColumn);
+
+  auto *buttonLayout = new QHBoxLayout();
+  buttonLayout->setContentsMargins(0, 0, 0, 0);
+
+  auto *defaultsButton = new QPushButton("Defaults", m_tomasuloOptionsGroup);
+  defaultsButton->setToolTip("Restore the default Tomasulo configuration");
+  connect(defaultsButton, &QPushButton::clicked, this,
+          &ProcessorTab::resetTomasuloOptionsToDefaults);
+
+  buttonLayout->addStretch();
+  buttonLayout->addWidget(defaultsButton);
+
+  mainLayout->addLayout(columnsLayout);
+  mainLayout->addLayout(buttonLayout);
+
+  resetTomasuloOptionsToDefaults();
+
+  // En processortab.ui, horizontalLayout_2 contiene:
+  //   0 -> Console/Memory tab widget
+  //   1 -> Execution info
+  // Insertamos Tomasulo options en medio:
+  //   0 -> Console/Memory
+  //   1 -> Tomasulo options
+  //   2 -> Execution info
+  m_ui->horizontalLayout_2->insertWidget(1, m_tomasuloOptionsGroup);
+  m_ui->horizontalLayout_2->setStretch(0, 1);
+  m_ui->horizontalLayout_2->setStretch(1, 0);
+  m_ui->horizontalLayout_2->setStretch(2, 0);
+}
+
+void ProcessorTab::resetTomasuloOptionsToDefaults() {
+  if (!m_tomasuloAddSubStations || !m_tomasuloMultStations ||
+      !m_tomasuloDivStations || !m_tomasuloLoadBuffers ||
+      !m_tomasuloStoreBuffers || !m_tomasuloAddSubLatency ||
+      !m_tomasuloMultLatency || !m_tomasuloDivLatency ||
+      !m_tomasuloLoadLatency || !m_tomasuloStoreLatency) {
+    return;
+  }
+
+  // Default reservation stations / buffers
+  m_tomasuloAddSubStations->setValue(3);
+  m_tomasuloMultStations->setValue(2);
+  m_tomasuloDivStations->setValue(1);
+  m_tomasuloLoadBuffers->setValue(3);
+  m_tomasuloStoreBuffers->setValue(3);
+
+  // Default operation latencies
+  m_tomasuloAddSubLatency->setValue(2);
+  m_tomasuloMultLatency->setValue(10);
+  m_tomasuloDivLatency->setValue(40);
+  m_tomasuloLoadLatency->setValue(2);
+  m_tomasuloStoreLatency->setValue(2);
+}
+
 void ProcessorTab::syncTomasuloWithEditor() {
   if (!m_tomasuloWidget) {
     return;
@@ -211,10 +395,14 @@ void ProcessorTab::showTomasuloView() {
   m_tomasuloWidget->show();
   m_vsrtlWidget->hide();
 
+  if (m_tomasuloOptionsGroup) {
+    m_tomasuloOptionsGroup->show();
+  }
+
   // Tras insertar Tomasulo, el splitter queda asi:
   //   0 -> TomasuloWidget
   //   1 -> vsrtlWidget oculto
-  //   2 -> zona inferior: consola/memoria
+  //   2 -> zona inferior: consola/memoria/opciones/info
   m_ui->pipelinesplitter->setStretchFactor(0, 5);
   m_ui->pipelinesplitter->setStretchFactor(1, 0);
   m_ui->pipelinesplitter->setStretchFactor(2, 2);
@@ -229,10 +417,14 @@ void ProcessorTab::showVSRTLView() {
   m_tomasuloWidget->hide();
   m_vsrtlWidget->show();
 
+  if (m_tomasuloOptionsGroup) {
+    m_tomasuloOptionsGroup->hide();
+  }
+
   // Modo normal de Ripes:
   //   0 -> TomasuloWidget oculto
   //   1 -> vsrtlWidget
-  //   2 -> zona inferior: consola/memoria
+  //   2 -> zona inferior: consola/memoria/info
   m_ui->pipelinesplitter->setStretchFactor(0, 0);
   m_ui->pipelinesplitter->setStretchFactor(1, 5);
   m_ui->pipelinesplitter->setStretchFactor(2, 2);
@@ -671,6 +863,10 @@ void ProcessorTab::autoClock(bool state) {
   m_displayValuesAction->setEnabled(!state);
   m_pipelineDiagramAction->setEnabled(!state);
   m_runAction->setEnabled(!state);
+
+  if (m_tomasuloOptionsGroup) {
+    m_tomasuloOptionsGroup->setEnabled(!state);
+  }
 }
 
 void ProcessorTab::run(bool state) {
@@ -699,6 +895,10 @@ void ProcessorTab::run(bool state) {
   m_vsrtlWidget->setEnabled(!state);
   m_ui->registerContainerWidget->setEnabled(!state);
   m_ui->instructionView->setEnabled(!state);
+
+  if (m_tomasuloOptionsGroup) {
+    m_tomasuloOptionsGroup->setEnabled(!state);
+  }
 }
 
 void ProcessorTab::reverse() {
