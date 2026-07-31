@@ -448,18 +448,19 @@ void ProcessorTab::reloadTomasuloProgram() {
   updateTomasuloExecutionInfo();
 }
 
+
 void ProcessorTab::clockTomasulo() {
   if (!m_tomasuloWidget) {
     return;
   }
 
-  if (!m_tomasuloWidget->isFinished()) {
-    m_tomasuloWidget->clock();
-  }
+  // Si estamos al final del historial, genera un ciclo nuevo.
+  // Si habiamos retrocedido, avanza al siguiente snapshot guardado.
+  m_tomasuloWidget->stepForward();
 
   updateTomasuloExecutionInfo();
+  enableSimulatorControls();
 }
-
 void ProcessorTab::syncTomasuloWithEditor() {
   reloadTomasuloProgram();
 }
@@ -885,15 +886,22 @@ void ProcessorTab::processorFinished() {
   m_runAction->setChecked(false);
 }
 
+
 void ProcessorTab::enableSimulatorControls() {
   m_clockAction->setEnabled(true);
   m_autoClockAction->setEnabled(true);
   m_runAction->setEnabled(true);
-  m_reverseAction->setEnabled(m_vsrtlWidget->isReversible());
+
+  if (m_usingTomasulo) {
+    m_reverseAction->setEnabled(m_tomasuloWidget &&
+                                m_tomasuloWidget->canStepBack());
+  } else {
+    m_reverseAction->setEnabled(m_vsrtlWidget->isReversible());
+  }
+
   m_resetAction->setEnabled(true);
   m_pipelineDiagramAction->setEnabled(true);
 }
-
 void ProcessorTab::updateInstructionLabels() {
   const auto &proc = ProcessorHandler::getProcessor();
   for (auto sid : ProcessorHandler::getProcessor()->structure().stageIt()) {
@@ -1017,6 +1025,7 @@ void ProcessorTab::run(bool state) {
     if (m_tomasuloWidget) {
       m_tomasuloWidget->runToCompletion();
       updateTomasuloExecutionInfo();
+      enableSimulatorControls();
     }
 
     if (m_runAction->isChecked()) {
@@ -1057,11 +1066,18 @@ void ProcessorTab::run(bool state) {
   }
 }
 
+
 void ProcessorTab::reverse() {
+  if (m_usingTomasulo && m_tomasuloWidget) {
+    m_tomasuloWidget->stepBack();
+    updateTomasuloExecutionInfo();
+    enableSimulatorControls();
+    return;
+  }
+
   m_vsrtlWidget->reverse();
   enableSimulatorControls();
 }
-
 void ProcessorTab::showPipelineDiagram() {
   auto w = PipelineDiagramWidget(m_stageModel);
   w.exec();
@@ -1190,6 +1206,7 @@ void ProcessorTab::updateTomasuloProcessorResponsiveLayout() {
   }
 }
 } // namespace Ripes
+
 
 
 

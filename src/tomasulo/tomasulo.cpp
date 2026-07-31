@@ -218,14 +218,44 @@ void TomasuloWidget::loadProgramText(const QString &programText) {
   resetSimulation(programText, TomasuloSim::TomasuloEngine::defaultConfig());
 }
 
+
 void TomasuloWidget::resetSimulation(const QString &programText,
                                      const TomasuloSim::Config &config) {
+  m_programText = programText;
+  m_config = config;
+
   if (!m_engine) {
     m_engine = std::make_unique<TomasuloSim::TomasuloEngine>();
   }
 
-  m_engine->loadProgramText(programText, config);
-  loadSnapshot(m_engine->snapshot());
+  m_engine->loadProgramText(m_programText, m_config);
+
+  m_history.clear();
+  m_history.push_back(m_engine->snapshot());
+  m_historyIndex = 0;
+
+  loadSnapshot(m_history[m_historyIndex]);
+}
+
+const TomasuloSim::TomasuloSnapshot *
+TomasuloWidget::currentHistorySnapshot() const {
+  if (m_history.empty() || m_historyIndex >= m_history.size()) {
+    return nullptr;
+  }
+
+  return &m_history[m_historyIndex];
+}
+
+void TomasuloWidget::rebuildEngineToHistoryIndex() {
+  if (!m_engine) {
+    m_engine = std::make_unique<TomasuloSim::TomasuloEngine>();
+  }
+
+  m_engine->loadProgramText(m_programText, m_config);
+
+  for (std::size_t i = 0; i < m_historyIndex && !m_engine->isFinished(); ++i) {
+    m_engine->step();
+  }
 }
 
 void TomasuloWidget::clock() {
@@ -233,8 +263,50 @@ void TomasuloWidget::clock() {
     return;
   }
 
-  m_engine->step();
-  loadSnapshot(m_engine->snapshot());
+  // Si estamos viendo un ciclo antiguo y ejecutamos desde ahi,
+  // reconstruimos el motor hasta ese ciclo y descartamos el futuro.
+  if (m_historyIndex + 1 < m_history.size()) {
+    rebuildEngineToHistoryIndex();
+    m_history.resize(m_historyIndex + 1);
+  }
+
+  if (!m_engine->isFinished()) {
+    m_engine->step();
+
+    m_history.push_back(m_engine->snapshot());
+    m_historyIndex = m_history.size() - 1;
+  }
+
+  if (const auto *snapshot = currentHistorySnapshot()) {
+    loadSnapshot(*snapshot);
+  }
+}
+
+void TomasuloWidget::stepBack() {
+  if (!canStepBack()) {
+    return;
+  }
+
+  --m_historyIndex;
+  loadSnapshot(m_history[m_historyIndex]);
+}
+
+void TomasuloWidget::stepForward() {
+  if (canStepForward()) {
+    ++m_historyIndex;
+    loadSnapshot(m_history[m_historyIndex]);
+    return;
+  }
+
+  clock();
+}
+
+bool TomasuloWidget::canStepBack() const {
+  return !m_history.empty() && m_historyIndex > 0;
+}
+
+bool TomasuloWidget::canStepForward() const {
+  return !m_history.empty() && m_historyIndex + 1 < m_history.size();
 }
 
 void TomasuloWidget::runToCompletion() {
@@ -242,11 +314,33 @@ void TomasuloWidget::runToCompletion() {
     return;
   }
 
-  m_engine->runToCompletion();
-  loadSnapshot(m_engine->snapshot());
+  if (m_historyIndex + 1 < m_history.size()) {
+    rebuildEngineToHistoryIndex();
+    m_history.resize(m_historyIndex + 1);
+  }
+
+  std::uint64_t guard = 0;
+  constexpr std::uint64_t maxCycles = 100000;
+
+  while (!m_engine->isFinished() && guard < maxCycles) {
+    m_engine->step();
+
+    m_history.push_back(m_engine->snapshot());
+    m_historyIndex = m_history.size() - 1;
+
+    ++guard;
+  }
+
+  if (const auto *snapshot = currentHistorySnapshot()) {
+    loadSnapshot(*snapshot);
+  }
 }
 
 std::uint64_t TomasuloWidget::currentCycle() const {
+  if (const auto *snapshot = currentHistorySnapshot()) {
+    return snapshot->cycle;
+  }
+
   if (!m_engine) {
     return 0;
   }
@@ -255,6 +349,10 @@ std::uint64_t TomasuloWidget::currentCycle() const {
 }
 
 std::uint64_t TomasuloWidget::instructionsRetired() const {
+  if (const auto *snapshot = currentHistorySnapshot()) {
+    return snapshot->instructionsRetired;
+  }
+
   if (!m_engine) {
     return 0;
   }
@@ -263,9 +361,12 @@ std::uint64_t TomasuloWidget::instructionsRetired() const {
 }
 
 bool TomasuloWidget::isFinished() const {
+  if (const auto *snapshot = currentHistorySnapshot()) {
+    return snapshot->finished;
+  }
+
   return m_engine && m_engine->isFinished();
 }
-
 void TomasuloWidget::clearRegisterTables() {
   QMap<QString, QString> emptyValues;
 
@@ -341,3 +442,4 @@ void TomasuloWidget::loadSnapshot(
 }
 
 } // namespace Ripes
+

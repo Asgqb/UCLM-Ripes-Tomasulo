@@ -5,8 +5,10 @@
 #include <QString>
 #include <QWidget>
 
+#include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <vector>
 
 class QTableWidget;
 
@@ -21,8 +23,15 @@ public:
 
   void resetSimulation(const QString &programText,
                        const TomasuloSim::Config &config);
+
   void clock();
+  void stepBack();
+  void stepForward();
   void runToCompletion();
+
+  bool canStepBack() const;
+  bool canStepForward() const;
+
   bool isFinished() const;
   std::uint64_t currentCycle() const;
   std::uint64_t instructionsRetired() const;
@@ -39,12 +48,20 @@ private:
   void loadSnapshot(const TomasuloSim::TomasuloSnapshot &snapshot);
   void clearRegisterTables();
 
+  void rebuildEngineToHistoryIndex();
+  const TomasuloSim::TomasuloSnapshot *currentHistorySnapshot() const;
+
   QTableWidget *m_instructionTable = nullptr;
   QTableWidget *m_reservationTable = nullptr;
   QTableWidget *m_registerResultTable1 = nullptr;
   QTableWidget *m_registerResultTable2 = nullptr;
 
   std::unique_ptr<TomasuloSim::TomasuloEngine> m_engine;
+
+  QString m_programText;
+  TomasuloSim::Config m_config;
+  std::vector<TomasuloSim::TomasuloSnapshot> m_history;
+  std::size_t m_historyIndex = 0;
 };
 
 } // namespace Ripes
