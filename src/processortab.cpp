@@ -1,4 +1,10 @@
 ﻿#include "processortab.h"
+
+#include <QResizeEvent>
+#include <QSplitter>
+#include <QList>
+#include <QScrollArea>
+#include <QFrame>
 #include "ui_processortab.h"
 
 #include <cstdint>
@@ -17,6 +23,9 @@
 #include <QSizePolicy>
 #include <QSpinBox>
 #include <QSplitter>
+#include <QList>
+#include <QScrollArea>
+#include <QFrame>
 #include <QTemporaryFile>
 #include <QVBoxLayout>
 
@@ -111,8 +120,18 @@ ProcessorTab::ProcessorTab(QToolBar *controlToolbar,
                            QToolBar *additionalToolbar, QWidget *parent)
     : RipesTab(additionalToolbar, parent), m_ui(new Ui::ProcessorTab) {
   m_ui->setupUi(this);
+  auto *processorViewScrollArea = new QScrollArea(this);
+  processorViewScrollArea->setObjectName("processorViewScrollArea");
+  processorViewScrollArea->setWidgetResizable(true);
+  processorViewScrollArea->setFrameShape(QFrame::NoFrame);
+  processorViewScrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+  processorViewScrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
 
-  m_vsrtlWidget = m_ui->vsrtlWidget;
+  m_ui->gridLayout->removeWidget(m_ui->viewSplitter);
+  processorViewScrollArea->setWidget(m_ui->viewSplitter);
+  m_ui->gridLayout->addWidget(processorViewScrollArea, 0, 0);
+
+m_vsrtlWidget = m_ui->vsrtlWidget;
 
   setupTomasuloOptionsWidget();
 
@@ -493,6 +512,7 @@ void ProcessorTab::showTomasuloView() {
   m_ui->pipelinesplitter->setStretchFactor(1, 0);
   m_ui->pipelinesplitter->setStretchFactor(2, 2);
   m_ui->pipelinesplitter->setSizes(QList<int>{520, 0, 220});
+  updateTomasuloProcessorResponsiveLayout();
 }
 
 void ProcessorTab::showVSRTLView() {
@@ -517,6 +537,7 @@ void ProcessorTab::showVSRTLView() {
   m_ui->pipelinesplitter->setSizes(QList<int>{0, 520, 220});
 
   fitToScreen();
+  updateTomasuloProcessorResponsiveLayout();
 }
 
 void ProcessorTab::loadLayout(const Layout &layout) {
@@ -1046,6 +1067,139 @@ void ProcessorTab::showPipelineDiagram() {
   w.exec();
 }
 
+
+
+
+
+
+
+
+
+void ProcessorTab::resizeEvent(QResizeEvent *event) {
+  QWidget::resizeEvent(event);
+  updateTomasuloProcessorResponsiveLayout();
+}
+
+
+void ProcessorTab::updateTomasuloProcessorResponsiveLayout() {
+  if (!m_ui || !m_ui->viewSplitter || !m_ui->pipelinesplitter ||
+      !m_ui->verticalLayoutWidget || !m_ui->horizontalLayoutWidget_2 ||
+      !m_ui->rightBarSplitter || !m_ui->groupBox || !m_ui->groupBox_3 ||
+      !m_ui->groupBox_2 || !m_ui->tabWidget) {
+    return;
+  }
+
+  auto *scrollArea = findChild<QScrollArea *>("processorViewScrollArea");
+  if (scrollArea) {
+    scrollArea->setWidgetResizable(true);
+    scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+  }
+
+  const bool tomasuloVisible =
+      m_tomasuloWidget != nullptr && m_tomasuloWidget->isVisible();
+
+  // Parte principal:
+  // arriba Tomasulo/VSRTL
+  // abajo Console + Tomasulo options + Execution info
+  if (m_ui->pipelinesplitter->orientation() != Qt::Vertical) {
+    m_ui->pipelinesplitter->setOrientation(Qt::Vertical);
+  }
+
+  m_ui->pipelinesplitter->setChildrenCollapsible(false);
+  m_ui->pipelinesplitter->setCollapsible(0, false);
+  m_ui->pipelinesplitter->setCollapsible(1, false);
+
+  m_ui->viewSplitter->setChildrenCollapsible(false);
+  m_ui->viewSplitter->setCollapsible(0, false);
+  m_ui->viewSplitter->setCollapsible(1, false);
+
+  m_ui->rightBarSplitter->setChildrenCollapsible(false);
+  m_ui->rightBarSplitter->setCollapsible(0, false);
+  m_ui->rightBarSplitter->setCollapsible(1, false);
+
+  m_ui->horizontalLayoutWidget_2->setVisible(true);
+
+  // Permitimos que el bloque inferior se reduzca más antes de sacar scroll.
+  m_ui->horizontalLayoutWidget_2->setMinimumHeight(tomasuloVisible ? 255 : 170);
+  m_ui->tabWidget->setMinimumWidth(tomasuloVisible ? 290 : 320);
+  m_ui->groupBox_2->setMinimumWidth(tomasuloVisible ? 180 : 220);
+
+  if (!tomasuloVisible) {
+    if (m_ui->viewSplitter->orientation() != Qt::Horizontal) {
+      m_ui->viewSplitter->setOrientation(Qt::Horizontal);
+    }
+
+    m_ui->viewSplitter->setMinimumWidth(0);
+    m_ui->viewSplitter->setMinimumHeight(0);
+    m_ui->pipelinesplitter->setMinimumHeight(0);
+    m_ui->verticalLayoutWidget->setMinimumHeight(0);
+    m_ui->groupBox->setMinimumHeight(0);
+    m_ui->groupBox_3->setMinimumHeight(0);
+
+    m_ui->viewSplitter->setSizes(QList<int>{1100, 330});
+    m_ui->pipelinesplitter->setSizes(QList<int>{560, 230});
+    m_ui->rightBarSplitter->setSizes(QList<int>{430, 280});
+    return;
+  }
+
+  const int availableWidth = width();
+
+  // Cambia a modo apilado antes de que se aplaste la zona Tomasulo.
+  const bool narrow = availableWidth < 1750;
+
+  if (narrow) {
+    if (m_ui->viewSplitter->orientation() != Qt::Vertical) {
+      m_ui->viewSplitter->setOrientation(Qt::Vertical);
+    }
+
+    // Antes estaba en 1350 y por eso salía scroll lateral demasiado pronto.
+    // Ahora dejamos que la interfaz se comprima hasta ~1120 px.
+    m_ui->viewSplitter->setMinimumWidth(1120);
+
+    // Altura suficiente para que haya scroll vertical real.
+    m_ui->horizontalLayoutWidget_2->setMinimumHeight(265);
+    m_ui->pipelinesplitter->setMinimumHeight(860);
+
+    m_ui->groupBox->setMinimumHeight(430);
+    m_ui->groupBox_3->setMinimumHeight(310);
+    m_ui->verticalLayoutWidget->setMinimumHeight(780);
+
+    m_ui->viewSplitter->setMinimumHeight(1660);
+
+    m_ui->viewSplitter->setSizes(QList<int>{860, 780});
+    m_ui->pipelinesplitter->setSizes(QList<int>{585, 270});
+    m_ui->rightBarSplitter->setSizes(QList<int>{450, 330});
+  } else {
+    if (m_ui->viewSplitter->orientation() != Qt::Horizontal) {
+      m_ui->viewSplitter->setOrientation(Qt::Horizontal);
+    }
+
+    // En ancho no forzamos scroll horizontal. Que reduzca primero.
+    m_ui->viewSplitter->setMinimumWidth(0);
+    m_ui->viewSplitter->setMinimumHeight(0);
+    m_ui->pipelinesplitter->setMinimumHeight(0);
+    m_ui->verticalLayoutWidget->setMinimumHeight(0);
+
+    m_ui->groupBox->setMinimumHeight(0);
+    m_ui->groupBox_3->setMinimumHeight(0);
+
+    m_ui->viewSplitter->setSizes(QList<int>{1180, 340});
+    m_ui->pipelinesplitter->setSizes(QList<int>{580, 260});
+    m_ui->rightBarSplitter->setSizes(QList<int>{430, 290});
+  }
+}
 } // namespace Ripes
+
+
+
+
+
+
+
+
+
+
+
 
 

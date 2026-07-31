@@ -69,9 +69,7 @@ static QStringList cleanProgramLines(const QString &programText) {
   return result;
 }
 
-TomasuloEngine::TomasuloEngine() : m_config(defaultConfig()) {
-  reset();
-}
+TomasuloEngine::TomasuloEngine() : m_config(defaultConfig()) { reset(); }
 
 Config TomasuloEngine::defaultConfig() {
   Config config;
@@ -239,9 +237,7 @@ void TomasuloEngine::runToCompletion(std::uint64_t maxCycles) {
   }
 }
 
-bool TomasuloEngine::isFinished() const {
-  return m_finished;
-}
+bool TomasuloEngine::isFinished() const { return m_finished; }
 
 QString TomasuloEngine::executionRange(const Row &row) const {
   if (!row.startEx) {
@@ -325,77 +321,119 @@ TomasuloEngine::buildReservationStations() const {
 
   return result;
 }
-std::vector<TomasuloRegisterResultStatus> TomasuloEngine::buildRegisters()
-    const {
+
+std::vector<TomasuloRegisterResultStatus>
+TomasuloEngine::buildRegisters() const {
   std::vector<TomasuloRegisterResultStatus> result;
 
-  for (int reg = 0; reg <= 30; reg += 2) {
-    TomasuloRegisterResultStatus status;
-    status.registerName = "F" + QString::number(reg);
-    status.qi = "";
-    result.push_back(status);
-  }
+  std::vector<std::string> registerOrder;
+  std::unordered_map<std::string, QString> qiByRegister;
 
-  if (!m_reorderBuffer) {
-    return result;
-  }
+  auto addRegisterToOrder = [&registerOrder](const Register &reg) {
+    const std::string name = reg.toString();
 
-  std::unordered_map<int, QString> qiByRegister;
-
-  const auto stages = m_reorderBuffer->getStages();
-
-  for (const auto &[instructionNum, op, stage] : stages) {
-    if (stage.kind == StageKind::WaitingToCommit ||
-        stage.kind == StageKind::Commit) {
-      continue;
+    if (std::find(registerOrder.begin(), registerOrder.end(), name) ==
+        registerOrder.end()) {
+      registerOrder.push_back(name);
     }
+  };
 
-    if (stage.kind == StageKind::WriteBack) {
-      continue;
-    }
-
+  for (const RiscVOp &op : m_instructions) {
     const auto dst = op.dst();
+
     if (!dst) {
       continue;
     }
 
     try {
-      const Register reg = dst->asReg();
-      if (reg.kind == RegisterKind::FP && reg.number <= 30 &&
-          reg.number % 2 == 0) {
-        qiByRegister[static_cast<int>(reg.number)] =
-            "I" + QString::number(instructionNum);
-      }
+      addRegisterToOrder(dst->asReg());
     } catch (...) {
     }
   }
 
-  for (TomasuloRegisterResultStatus &status : result) {
-    bool ok = false;
-    const int regNumber = status.registerName.mid(1).toInt(&ok);
+  if (m_reorderBuffer) {
+    const auto stages = m_reorderBuffer->getStages();
 
-    if (!ok) {
-      continue;
+    int addStation = 0;
+    int multStation = 0;
+    int loadStation = 0;
+    int storeStation = 0;
+    int intStation = 0;
+    int genericStation = 0;
+
+    auto stationNameForOp = [&](const RiscVOp &op) {
+      if (op.isFpAdd()) {
+        return "Add" + QString::number(addStation++);
+      }
+
+      if (op.isFpMul()) {
+        return "Mult" + QString::number(multStation++);
+      }
+
+      if (op.isLoad()) {
+        return "Load" + QString::number(loadStation++);
+      }
+
+      if (op.isStore()) {
+        return "Store" + QString::number(storeStation++);
+      }
+
+      if (op.isAlu() || op.isBranch()) {
+        return "Int" + QString::number(intStation++);
+      }
+
+      return "RS" + QString::number(genericStation++);
+    };
+
+    for (const auto &[instructionNum, op, stage] : stages) {
+      const QString stationName = stationNameForOp(op);
+
+      if (stage.kind == StageKind::WaitingToCommit ||
+          stage.kind == StageKind::Commit ||
+          stage.kind == StageKind::WriteBack) {
+        continue;
+      }
+
+      const auto dst = op.dst();
+
+      if (!dst) {
+        continue;
+      }
+
+      try {
+        const Register reg = dst->asReg();
+        addRegisterToOrder(reg);
+        qiByRegister[reg.toString()] = stationName;
+      } catch (...) {
+      }
     }
+  }
 
-    const auto it = qiByRegister.find(regNumber);
+  for (const std::string &name : registerOrder) {
+    TomasuloRegisterResultStatus status;
+    status.registerName = QString::fromStdString(name).toUpper();
+
+    const auto it = qiByRegister.find(name);
     if (it != qiByRegister.end()) {
       status.qi = it->second;
     }
+
+    result.push_back(status);
   }
 
   return result;
 }
-
 TomasuloSnapshot TomasuloEngine::snapshot() const {
   TomasuloSnapshot snapshot;
   snapshot.cycle = m_visibleCycle;
+
   snapshot.instructionsRetired = 0;
   for (const Row &row : m_rows) {
     if (row.committed) {
       snapshot.instructionsRetired++;
     }
   }
+
   snapshot.finished = m_finished;
   snapshot.error = m_error;
 
@@ -415,6 +453,4 @@ TomasuloSnapshot TomasuloEngine::snapshot() const {
 }
 
 } // namespace Ripes::TomasuloSim
-
-
 

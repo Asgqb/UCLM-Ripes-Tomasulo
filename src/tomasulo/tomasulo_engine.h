@@ -93,5 +93,3 @@ private:
 };
 
 } // namespace Ripes::TomasuloSim
-
-

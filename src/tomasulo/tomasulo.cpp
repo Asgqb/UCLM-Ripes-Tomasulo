@@ -1,15 +1,21 @@
 ﻿#include "tomasulo.h"
 
+#include <algorithm>
+#include <vector>
+
 #include <QAbstractItemView>
-#include <QFont>
 #include <QGroupBox>
 #include <QHeaderView>
 #include <QHBoxLayout>
+#include <QList>
+#include <QMap>
 #include <QSizePolicy>
+#include <QSplitter>
 #include <QStringList>
 #include <QTableWidget>
 #include <QTableWidgetItem>
 #include <QVBoxLayout>
+#include <QWidget>
 
 namespace Ripes {
 
@@ -17,6 +23,49 @@ static QTableWidgetItem *makeTableItem(const QString &text) {
   auto *item = new QTableWidgetItem(text);
   item->setFlags(Qt::ItemIsEnabled);
   return item;
+}
+
+static QString detectRegisterPrefix(
+    const std::vector<TomasuloSim::TomasuloRegisterResultStatus> &registers) {
+  for (const auto &reg : registers) {
+    const QString name = reg.registerName.trimmed().toUpper();
+
+    if (name.startsWith("X")) {
+      return "X";
+    }
+  }
+
+  for (const auto &reg : registers) {
+    const QString name = reg.registerName.trimmed().toUpper();
+
+    if (name.startsWith("F")) {
+      return "F";
+    }
+  }
+
+  return "F";
+}
+
+static void fillRegisterTable(QTableWidget *table,
+                              const QMap<QString, QString> &qiByRegister,
+                              const QString &prefix, int firstRegister,
+                              int columnCount, int step) {
+  table->clear();
+  table->setRowCount(1);
+  table->setColumnCount(columnCount);
+  table->setVerticalHeaderLabels({"Qi"});
+
+  QStringList headers;
+
+  for (int col = 0; col < columnCount; ++col) {
+    const int regNumber = firstRegister + col * step;
+    const QString regName = prefix + QString::number(regNumber);
+
+    headers << regName;
+    table->setItem(0, col, makeTableItem(qiByRegister.value(regName)));
+  }
+
+  table->setHorizontalHeaderLabels(headers);
 }
 
 TomasuloWidget::TomasuloWidget(QWidget *parent)
@@ -32,10 +81,21 @@ void TomasuloWidget::setupUi() {
   mainLayout->setContentsMargins(4, 4, 4, 4);
   mainLayout->setSpacing(4);
 
-  auto *topLayout = new QHBoxLayout();
+  auto *mainSplitter = new QSplitter(Qt::Vertical, this);
+  mainSplitter->setChildrenCollapsible(false);
+  mainSplitter->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+
+  auto *topContainer = new QWidget(mainSplitter);
+  topContainer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+
+  auto *topLayout = new QHBoxLayout(topContainer);
+  topLayout->setContentsMargins(0, 0, 0, 0);
   topLayout->setSpacing(6);
 
-  auto *instructionGroup = new QGroupBox("Estado instruccion", this);
+  auto *instructionGroup = new QGroupBox("Estado instruccion", topContainer);
+  instructionGroup->setSizePolicy(QSizePolicy::Expanding,
+                                  QSizePolicy::Expanding);
+
   auto *instructionLayout = new QVBoxLayout(instructionGroup);
   instructionLayout->setContentsMargins(4, 4, 4, 4);
   instructionLayout->setSpacing(2);
@@ -44,7 +104,10 @@ void TomasuloWidget::setupUi() {
   instructionLayout->addWidget(m_instructionTable);
 
   auto *reservationGroup =
-      new QGroupBox("Estado de las estaciones de reserva", this);
+      new QGroupBox("Estado de las estaciones de reserva", topContainer);
+  reservationGroup->setSizePolicy(QSizePolicy::Expanding,
+                                  QSizePolicy::Expanding);
+
   auto *reservationLayout = new QVBoxLayout(reservationGroup);
   reservationLayout->setContentsMargins(4, 4, 4, 4);
   reservationLayout->setSpacing(2);
@@ -56,7 +119,10 @@ void TomasuloWidget::setupUi() {
   topLayout->addWidget(reservationGroup, 2);
 
   auto *registerGroup =
-      new QGroupBox("Estado de los registros resultado", this);
+      new QGroupBox("Estado de los registros resultado", mainSplitter);
+  registerGroup->setMinimumHeight(125);
+  registerGroup->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+
   auto *registerLayout = new QVBoxLayout(registerGroup);
   registerLayout->setContentsMargins(4, 4, 4, 4);
   registerLayout->setSpacing(4);
@@ -66,8 +132,14 @@ void TomasuloWidget::setupUi() {
   registerLayout->addWidget(m_registerResultTable1);
   registerLayout->addWidget(m_registerResultTable2);
 
-  mainLayout->addLayout(topLayout, 1);
-  mainLayout->addWidget(registerGroup, 0);
+  mainSplitter->addWidget(topContainer);
+  mainSplitter->addWidget(registerGroup);
+
+  mainSplitter->setStretchFactor(0, 4);
+  mainSplitter->setStretchFactor(1, 1);
+  mainSplitter->setSizes(QList<int>{420, 135});
+
+  mainLayout->addWidget(mainSplitter);
 }
 
 void TomasuloWidget::setupInstructionTable() {
@@ -136,7 +208,7 @@ void TomasuloWidget::configureCompactRegisterTable(QTableWidget *table) {
   table->verticalHeader()->setDefaultSectionSize(22);
 
   table->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-  table->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+  table->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
 
   table->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
   table->setFixedHeight(54);
@@ -189,18 +261,16 @@ std::uint64_t TomasuloWidget::instructionsRetired() const {
 
   return m_engine->snapshot().instructionsRetired;
 }
+
 bool TomasuloWidget::isFinished() const {
   return m_engine && m_engine->isFinished();
 }
 
 void TomasuloWidget::clearRegisterTables() {
-  for (int col = 0; col < m_registerResultTable1->columnCount(); ++col) {
-    m_registerResultTable1->setItem(0, col, makeTableItem(""));
-  }
+  QMap<QString, QString> emptyValues;
 
-  for (int col = 0; col < m_registerResultTable2->columnCount(); ++col) {
-    m_registerResultTable2->setItem(0, col, makeTableItem(""));
-  }
+  fillRegisterTable(m_registerResultTable1, emptyValues, "F", 0, 8, 2);
+  fillRegisterTable(m_registerResultTable2, emptyValues, "F", 16, 8, 2);
 }
 
 void TomasuloWidget::loadSnapshot(
@@ -239,24 +309,23 @@ void TomasuloWidget::loadSnapshot(
     m_reservationTable->setItem(row, 7, makeTableItem(station.address));
   }
 
-  clearRegisterTables();
+  QMap<QString, QString> qiByRegister;
 
   for (const auto &reg : snapshot.registers) {
-    bool ok = false;
-    const int number = reg.registerName.mid(1).toInt(&ok);
-
-    if (!ok) {
-      continue;
-    }
-
-    if (number >= 0 && number <= 14 && number % 2 == 0) {
-      const int col = number / 2;
-      m_registerResultTable1->setItem(0, col, makeTableItem(reg.qi));
-    } else if (number >= 16 && number <= 30 && number % 2 == 0) {
-      const int col = (number - 16) / 2;
-      m_registerResultTable2->setItem(0, col, makeTableItem(reg.qi));
-    }
+    qiByRegister.insert(reg.registerName.trimmed().toUpper(), reg.qi);
   }
+
+  const QString prefix = detectRegisterPrefix(snapshot.registers);
+
+  if (prefix == "X") {
+    fillRegisterTable(m_registerResultTable1, qiByRegister, "X", 0, 16, 1);
+    fillRegisterTable(m_registerResultTable2, qiByRegister, "X", 16, 16, 1);
+  } else {
+    fillRegisterTable(m_registerResultTable1, qiByRegister, "F", 0, 8, 2);
+    fillRegisterTable(m_registerResultTable2, qiByRegister, "F", 16, 8, 2);
+  }
+
+  m_registerResultTable2->setVisible(true);
 
   m_instructionTable->clearSelection();
   m_instructionTable->setCurrentItem(nullptr);
@@ -272,5 +341,3 @@ void TomasuloWidget::loadSnapshot(
 }
 
 } // namespace Ripes
-
-

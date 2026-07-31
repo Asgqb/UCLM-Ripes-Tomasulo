@@ -16,6 +16,7 @@ namespace vsrtl {
 class VSRTLWidget;
 class Label;
 } // namespace vsrtl
+class QResizeEvent;
 
 namespace Ripes {
 
@@ -57,7 +58,7 @@ public slots:
 
   void processorSelection();
   void cacheSelection();
-
+
 private slots:
   void run(bool state);
   void autoClock(bool state);
@@ -127,8 +128,36 @@ private:
   QSpinBox *m_autoClockInterval = nullptr;
 
   bool m_usingTomasulo = true;
+
+protected:
+private:
+
+protected:
+private:
+
+protected:
+private:
+
+protected:
+private:
+
+protected:
+  void resizeEvent(QResizeEvent *event) override;
+
+private:
+  void updateTomasuloProcessorResponsiveLayout();
 };
 
 } // namespace Ripes
+
+
+
+
+
+
+
+
+
+
 
 
