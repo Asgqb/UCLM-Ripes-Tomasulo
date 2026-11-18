@@ -1,14 +1,15 @@
 ﻿#include "processortab.h"
-
+#include <QStringList>
 #include <QResizeEvent>
 #include <QSplitter>
 #include <QList>
 #include <QScrollArea>
 #include <QFrame>
 #include "ui_processortab.h"
-
 #include <cstdint>
-
+#include <QHash>
+#include <QRegularExpression>
+#include <QStringList>
 #include <QDebug>
 #include <QDir>
 #include <QFontMetrics>
@@ -28,6 +29,7 @@
 #include <QFrame>
 #include <QTemporaryFile>
 #include <QVBoxLayout>
+#include <QDebug>
 
 #include "cacheselectiondialog.h"
 #include "cachesim/cachetypes.h"
@@ -416,6 +418,10 @@ void ProcessorTab::resetTomasuloOptionsToDefaults() {
   m_tomasuloFpDivLatency->setValue(10);
 }
 
+
+
+
+
 void ProcessorTab::reloadTomasuloProgram() {
   if (!m_tomasuloWidget) {
     return;
@@ -443,10 +449,245 @@ void ProcessorTab::reloadTomasuloProgram() {
   config.fp_div_buffer_latency =
       static_cast<std::uint64_t>(m_tomasuloFpDivLatency->value());
 
+  const QString source =
+      RipesSettings::value(RIPES_SETTING_SOURCECODE).toString();
+
+  // Direccion inicial provisional del segmento de datos.
+  quint64 nextDataAddress = 0x10000000ULL;
+
+  QHash<QString, quint64> dataLabels;
+  QHash<QString, quint64> registerAddresses;
+
+  QStringList textLines;
+  QStringList preparedLines;
+
+  const QRegularExpression labelPattern(
+      R"(^([A-Za-z_][A-Za-z0-9_.$]*)\s*:\s*(.*)$)");
+
+  const QRegularExpression globalPattern(
+      R"(^\.(globl|global)\s+.+$)");
+
+  const QRegularExpression laPattern(
+      R"(^la\s+([^,\s]+)\s*,\s*([A-Za-z_][A-Za-z0-9_.$]*)$)");
+
+  const QRegularExpression memoryPattern(
+      R"(^(flw|fsw|lw|sw)\s+([^,]+)\s*,\s*(\d+)\s*\(\s*([A-Za-z][A-Za-z0-9]*)\s*\)$)");
+
+  const QStringList abiRegisters = {
+      "zero", "ra", "sp", "gp", "tp",
+      "t0", "t1", "t2", "s0", "s1",
+      "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7",
+      "s2", "s3", "s4", "s5", "s6", "s7",
+      "s8", "s9", "s10", "s11",
+      "t3", "t4", "t5", "t6"
+  };
+
+  auto normalizeRegister = [&](const QString &reg) -> QString {
+    const QString name = reg.trimmed().toLower();
+
+    if (name == "fp") {
+      return "x8";
+    }
+
+    if (name.startsWith('x')) {
+      bool ok = false;
+      const int number = name.mid(1).toInt(&ok);
+
+      if (ok && number >= 0 && number <= 31) {
+        return "x" + QString::number(number);
+      }
+    }
+
+    const int index = abiRegisters.indexOf(name);
+
+    if (index >= 0) {
+      return "x" + QString::number(index);
+    }
+
+    return {};
+  };
+
+  auto reportError = [&](const QString &message) {
+    m_tomasuloWidget->resetSimulation(QString(), config);
+    updateTomasuloExecutionInfo();
+    QMessageBox::warning(this, "Tomasulo", message);
+  };
+
+  enum class Section {
+    Text,
+    Data
+  };
+
+  Section section = Section::Text;
+
+  // Primera pasada: identificar datos y etiquetas.
+  for (QString line : source.split('\n')) {
+    const int hashPos = line.indexOf('#');
+    if (hashPos >= 0) {
+      line = line.left(hashPos);
+    }
+
+    const int slashPos = line.indexOf("//");
+    if (slashPos >= 0) {
+      line = line.left(slashPos);
+    }
+
+    line = line.trimmed();
+
+    if (line.isEmpty()) {
+      continue;
+    }
+
+    if (line == ".data") {
+      section = Section::Data;
+      continue;
+    }
+
+    if (line == ".text") {
+      section = Section::Text;
+      continue;
+    }
+
+    if (globalPattern.match(line).hasMatch()) {
+      continue;
+    }
+
+    const auto labelMatch = labelPattern.match(line);
+
+    if (labelMatch.hasMatch()) {
+      const QString label = labelMatch.captured(1);
+
+      if (section == Section::Data) {
+        if (dataLabels.contains(label)) {
+          reportError("Etiqueta duplicada: " + label);
+          return;
+        }
+
+        dataLabels.insert(label, nextDataAddress);
+      }
+
+      line = labelMatch.captured(2).trimmed();
+
+      if (line.isEmpty()) {
+        continue;
+      }
+    }
+
+    if (section == Section::Data) {
+      bool isFloat = false;
+      QString valuesText;
+
+      if (line.startsWith(".float ")) {
+        isFloat = true;
+        valuesText = line.mid(7).trimmed();
+      } else if (line.startsWith(".word ")) {
+        valuesText = line.mid(6).trimmed();
+      } else {
+        reportError("Directiva de datos no soportada: " + line);
+        return;
+      }
+
+      const QStringList values =
+          valuesText.split(',', Qt::KeepEmptyParts);
+
+      for (const QString &value : values) {
+        bool ok = false;
+
+        if (isFloat) {
+          value.trimmed().toFloat(&ok);
+        } else {
+          value.trimmed().toLongLong(&ok, 0);
+        }
+
+        if (!ok) {
+          reportError("Valor de datos no valido: " + value);
+          return;
+        }
+
+        nextDataAddress += 4;
+      }
+
+      continue;
+    }
+
+    if (line.startsWith('.')) {
+      reportError("Directiva no soportada: " + line);
+      return;
+    }
+
+    textLines.append(line);
+  }
+
+  // Segunda pasada: resolver la y direcciones de memoria.
+  for (const QString &line : textLines) {
+    const auto laMatch = laPattern.match(line);
+
+    if (laMatch.hasMatch()) {
+      const QString reg =
+          normalizeRegister(laMatch.captured(1));
+      const QString label = laMatch.captured(2);
+
+      if (reg.isEmpty() || !dataLabels.contains(label)) {
+        reportError("No se puede resolver: " + line);
+        return;
+      }
+
+      // Preparacion estatica: no se emite como instruccion.
+      registerAddresses.insert(reg, dataLabels.value(label));
+      continue;
+    }
+
+    if (line.startsWith("la ")) {
+      reportError("Pseudoinstruccion no soportada: " + line);
+      return;
+    }
+
+    const auto memMatch = memoryPattern.match(line);
+
+    if (memMatch.hasMatch()) {
+      const QString operation = memMatch.captured(1);
+      const QString destination = memMatch.captured(2).trimmed();
+      const QString offsetText = memMatch.captured(3);
+
+      const QString base =
+          normalizeRegister(memMatch.captured(4));
+
+      if (base.isEmpty()) {
+        reportError("Registro no reconocido: " + line);
+        return;
+      }
+
+      QString prepared =
+          QString("%1 %2, %3(%4)")
+              .arg(operation)
+              .arg(destination)
+              .arg(offsetText)
+              .arg(base);
+
+      if (registerAddresses.contains(base)) {
+        const quint64 address =
+            registerAddresses.value(base) +
+            offsetText.toULongLong();
+
+        prepared += ":" + QString::number(address);
+      }
+
+      preparedLines.append(prepared);
+      continue;
+    }
+
+    // Las demas instrucciones se conservan.
+    preparedLines.append(line);
+  }
+
+
+  // Enviar el programa al motor.
   m_tomasuloWidget->resetSimulation(
-      RipesSettings::value(RIPES_SETTING_SOURCECODE).toString(), config);
+      preparedLines.join('\n'), config);
+
   updateTomasuloExecutionInfo();
 }
+
 
 
 void ProcessorTab::clockTomasulo() {
