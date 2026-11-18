@@ -420,8 +420,6 @@ void ProcessorTab::resetTomasuloOptionsToDefaults() {
 
 
 
-
-
 void ProcessorTab::reloadTomasuloProgram() {
   if (!m_tomasuloWidget) {
     return;
@@ -452,13 +450,12 @@ void ProcessorTab::reloadTomasuloProgram() {
   const QString source =
       RipesSettings::value(RIPES_SETTING_SOURCECODE).toString();
 
-  // Direccion inicial provisional del segmento de datos.
   quint64 nextDataAddress = 0x10000000ULL;
 
   QHash<QString, quint64> dataLabels;
   QHash<QString, quint64> registerAddresses;
 
-  QStringList textLines;
+  QVector<std::pair<qsizetype, QString>> textLines;
   QStringList preparedLines;
 
   const QRegularExpression labelPattern(
@@ -471,7 +468,10 @@ void ProcessorTab::reloadTomasuloProgram() {
       R"(^la\s+([^,\s]+)\s*,\s*([A-Za-z_][A-Za-z0-9_.$]*)$)");
 
   const QRegularExpression memoryPattern(
-      R"(^(flw|fsw|lw|sw)\s+([^,]+)\s*,\s*(\d+)\s*\(\s*([A-Za-z][A-Za-z0-9]*)\s*\)$)");
+      R"(^(flw|fsw|lw|sw)\s+([^,]+)\s*,\s*([+-]?\d+)\s*\(\s*([A-Za-z][A-Za-z0-9]*)\s*\)\s*(?::\s*(\d+))?$)");
+
+  const QRegularExpression instructionPattern(
+      R"(^([A-Za-z][A-Za-z0-9_.]*)\s+(.+)$)");
 
   const QStringList abiRegisters = {
       "zero", "ra", "sp", "gp", "tp",
@@ -482,35 +482,48 @@ void ProcessorTab::reloadTomasuloProgram() {
       "t3", "t4", "t5", "t6"
   };
 
-  auto normalizeRegister = [&](const QString &reg) -> QString {
+  const QStringList fpAbiRegisters = {
+      "ft0", "ft1", "ft2", "ft3", "ft4", "ft5", "ft6", "ft7",
+      "fs0", "fs1", "fa0", "fa1", "fa2", "fa3", "fa4", "fa5",
+      "fa6", "fa7", "fs2", "fs3", "fs4", "fs5", "fs6", "fs7",
+      "fs8", "fs9", "fs10", "fs11", "ft8", "ft9", "ft10", "ft11"
+  };
+  auto normalizeRegister = [&](const QString &reg, bool floatingPoint = false) -> QString {
     const QString name = reg.trimmed().toLower();
+    const QChar prefix = floatingPoint ? QChar('f') : QChar('x');
 
-    if (name == "fp") {
+    if (!floatingPoint && name == "fp") {
       return "x8";
     }
 
-    if (name.startsWith('x')) {
+    if (name.startsWith(prefix)) {
       bool ok = false;
       const int number = name.mid(1).toInt(&ok);
 
       if (ok && number >= 0 && number <= 31) {
-        return "x" + QString::number(number);
+        return prefix + QString::number(number);
       }
     }
 
-    const int index = abiRegisters.indexOf(name);
-
+    const auto &aliases = floatingPoint ? fpAbiRegisters : abiRegisters;
+    const auto index = aliases.indexOf(name);
     if (index >= 0) {
-      return "x" + QString::number(index);
+      return prefix + QString::number(index);
     }
 
     return {};
   };
 
+  qsizetype lineNumber = 0;
   auto reportError = [&](const QString &message) {
+    if (m_usingTomasulo) {
+      SystemIO::printString(QString("Tomasulo, línea %1: %2\n")
+                                .arg(lineNumber)
+                                .arg(message));
+    }
+
     m_tomasuloWidget->resetSimulation(QString(), config);
     updateTomasuloExecutionInfo();
-    QMessageBox::warning(this, "Tomasulo", message);
   };
 
   enum class Section {
@@ -520,8 +533,10 @@ void ProcessorTab::reloadTomasuloProgram() {
 
   Section section = Section::Text;
 
-  // Primera pasada: identificar datos y etiquetas.
+  // PRIMERA PASADA:
+  // Identificar datos, etiquetas y directivas.
   for (QString line : source.split('\n')) {
+    ++lineNumber;
     const int hashPos = line.indexOf('#');
     if (hashPos >= 0) {
       line = line.left(hashPos);
@@ -530,6 +545,11 @@ void ProcessorTab::reloadTomasuloProgram() {
     const int slashPos = line.indexOf("//");
     if (slashPos >= 0) {
       line = line.left(slashPos);
+    }
+
+    const auto traceCommentPos = line.indexOf(";;");
+    if (traceCommentPos >= 0) {
+      line = line.left(traceCommentPos);
     }
 
     line = line.trimmed();
@@ -615,16 +635,21 @@ void ProcessorTab::reloadTomasuloProgram() {
       return;
     }
 
-    textLines.append(line);
+    textLines.append({lineNumber, line});
   }
 
-  // Segunda pasada: resolver la y direcciones de memoria.
-  for (const QString &line : textLines) {
+  // SEGUNDA PASADA:
+  // Resolver etiquetas, direcciones y modificaciones de registros.
+  for (const auto &[sourceLine, line] : textLines) {
+    lineNumber = sourceLine;
+
+    // Resolver pseudoinstruccion LA.
     const auto laMatch = laPattern.match(line);
 
     if (laMatch.hasMatch()) {
       const QString reg =
           normalizeRegister(laMatch.captured(1));
+
       const QString label = laMatch.captured(2);
 
       if (reg.isEmpty() || !dataLabels.contains(label)) {
@@ -632,8 +657,9 @@ void ProcessorTab::reloadTomasuloProgram() {
         return;
       }
 
-      // Preparacion estatica: no se emite como instruccion.
-      registerAddresses.insert(reg, dataLabels.value(label));
+      if (reg != "x0") {
+        registerAddresses.insert(reg, dataLabels.value(label));
+      }
       continue;
     }
 
@@ -642,46 +668,117 @@ void ProcessorTab::reloadTomasuloProgram() {
       return;
     }
 
+    // Procesar accesos a memoria.
     const auto memMatch = memoryPattern.match(line);
 
     if (memMatch.hasMatch()) {
-      const QString operation = memMatch.captured(1);
-      const QString destination = memMatch.captured(2).trimmed();
+      const QString operation =
+          memMatch.captured(1).toLower();
+
+      const QString dataRegister =
+          normalizeRegister(memMatch.captured(2), operation.startsWith('f'));
+
       const QString offsetText = memMatch.captured(3);
+      bool validOffset = false;
+      const qlonglong offset = offsetText.toLongLong(&validOffset);
 
       const QString base =
           normalizeRegister(memMatch.captured(4));
 
-      if (base.isEmpty()) {
+      if (base.isEmpty() || dataRegister.isEmpty()) {
         reportError("Registro no reconocido: " + line);
+        return;
+      }
+      if (!validOffset || offset < -2048 || offset > 2047) {
+        reportError("Desplazamiento fuera de rango: " + line);
         return;
       }
 
       QString prepared =
           QString("%1 %2, %3(%4)")
               .arg(operation)
-              .arg(destination)
-              .arg(offsetText)
+              .arg(dataRegister)
+              .arg(offset)
               .arg(base);
 
-      if (registerAddresses.contains(base)) {
-        const quint64 address =
-            registerAddresses.value(base) +
-            offsetText.toULongLong();
-
+      if (!memMatch.captured(5).isEmpty()) {
+        bool validAddress = false;
+        const auto address = memMatch.captured(5).toULongLong(&validAddress);
+        if (!validAddress) {
+          reportError("Dirección de traza fuera de rango: " + line);
+          return;
+        }
         prepared += ":" + QString::number(address);
+      } else if (registerAddresses.contains(base)) {
+        const auto address =
+            static_cast<qlonglong>(registerAddresses.value(base)) + offset;
+        prepared += ":" + QString::number(address);
+      } else if (base == "x0" && offset >= 0) {
+        prepared += ":" + QString::number(offset);
+      } else {
+        reportError("No se puede resolver la dirección de " + line +
+                    ". Usa la con una etiqueta de datos o añade :dirección.");
+        return;
       }
 
       preparedLines.append(prepared);
+
+      // LW modifica un registro entero.
+      if (operation == "lw") {
+        registerAddresses.remove(dataRegister);
+      }
+
       continue;
     }
 
-    // Las demas instrucciones se conservan.
-    preparedLines.append(line);
+    const auto instructionMatch = instructionPattern.match(line);
+    const QString mnemonic = line.simplified().section(' ', 0, 0).toLower();
+    if (mnemonic == "lw" || mnemonic == "sw" ||
+        mnemonic == "flw" || mnemonic == "fsw") {
+      reportError("Acceso a memoria no reconocido: " + line);
+      return;
+    }
+
+    if (instructionMatch.hasMatch()) {
+      const QString operands =
+          instructionMatch.captured(2);
+
+      const bool floatArithmetic =
+          mnemonic == "fadd" || mnemonic == "fadd.s" ||
+          mnemonic == "fsub" || mnemonic == "fsub.s" ||
+          mnemonic == "fmul" || mnemonic == "fmul.s" ||
+          mnemonic == "fdiv" || mnemonic == "fdiv.s";
+      const bool integerArithmetic = mnemonic == "add" || mnemonic == "sub";
+      const bool branch = mnemonic == "beq" || mnemonic == "bne";
+
+      if (floatArithmetic || integerArithmetic || branch) {
+        QStringList args = operands.split(',');
+        if (args.size() != 3 || args[2].trimmed().isEmpty()) {
+          reportError("Se esperaban tres operandos: " + line);
+          return;
+        }
+        const int registerCount = branch ? 2 : 3;
+        for (int index = 0; index < registerCount; ++index) {
+          args[index] = normalizeRegister(args[index], floatArithmetic);
+          if (args[index].isEmpty()) {
+            reportError("Registro no reconocido: " + line);
+            return;
+          }
+        }
+        preparedLines.append(mnemonic + " " + args.join(','));
+        if (integerArithmetic && args[0] != "x0") {
+          registerAddresses.remove(args[0]);
+        }
+        continue;
+      }
+
+    }
+
+    reportError("Instrucción o pseudoinstrucción no admitida: " + line);
+    return;
   }
 
-
-  // Enviar el programa al motor.
+  // Enviar el programa preparado al motor Tomasulo.
   m_tomasuloWidget->resetSimulation(
       preparedLines.join('\n'), config);
 
